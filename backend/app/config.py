@@ -1,0 +1,46 @@
+# app/config.py
+"""Typed application settings, loaded from the environment (or a local .env).
+
+Single source of truth for everything the backend needs to reach OpenAI and
+tune retrieval. Field names map to the UPPER_CASE env vars case-insensitively,
+so `openai_api_key` reads `OPENAI_API_KEY`. See .env.example.
+"""
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # Required — the app cannot embed or answer without it, so fail fast and
+    # loud at startup rather than silently at the first OpenAI call.
+    openai_api_key: str
+
+    embedding_model: str = "text-embedding-3-small"
+    chat_model: str = "gpt-4o-mini"
+
+    # Cosine-similarity floor for treating a chunk as relevant. Below this we
+    # return "I couldn't find this in the documents." rather than guess.
+    similarity_threshold: float = 0.35
+
+    # Comma-separated in the environment, e.g.
+    # "http://localhost:3000,https://ask-your-docs.vercel.app".
+    # Kept as a raw string and split on demand: pydantic-settings would try to
+    # JSON-decode a `list[str]` env value and choke on the comma form.
+    allowed_origins: str = "http://localhost:3000"
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Cached accessor so settings are parsed once per process."""
+    return Settings()

@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Env — never commit these
+.env
+.env.local
+*.env
+
+# Node / Next
+node_modules/
+.next/
+out/
+
+# Chroma local persistence
+backend/.chroma/
+chroma_db/
+
+# OS
+.DS_Store

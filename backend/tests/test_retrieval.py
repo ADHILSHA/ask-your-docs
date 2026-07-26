@@ -33,7 +33,7 @@ def _install_fake(monkeypatch):
     return calls
 
 
-def test_embed_batches_multiple_texts_into_few_calls(monkeypatch, tmp_path):
+def test_embed_batches_multiple_texts_into_few_calls(monkeypatch):
     calls = _install_fake(monkeypatch)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 

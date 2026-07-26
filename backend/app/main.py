@@ -1,5 +1,5 @@
 # app/main.py
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.chunking import chunk_text
@@ -65,4 +65,28 @@ async def upload(files: list[UploadFile] = File(...)):
         "files": results,
         "chunks_indexed": total_chunks,
         "message": f"Indexed {total_chunks} chunk(s) from {len(files)} file(s).",
+    }
+
+
+@app.get("/search")
+def search(q: str = Query(..., description="Question to retrieve chunks for"), k: int = 5):
+    """TEMPORARY debug endpoint: embed the question and return the top-k chunks
+    with raw similarity scores and metadata.
+
+    No threshold filtering and no LLM answer — this exists to eyeball retrieval
+    quality via curl. It'll be folded into /ask (with grounding) next slice.
+    """
+    embedding = embed([q])[0]
+    results = store.query(embedding, k=k)
+    return {
+        "question": q,
+        "results": [
+            {
+                "score": score,
+                "filename": chunk.filename,
+                "chunk_index": chunk.chunk_index,
+                "text": chunk.text,
+            }
+            for chunk, score in results
+        ],
     }

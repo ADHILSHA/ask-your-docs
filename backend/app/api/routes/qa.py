@@ -4,21 +4,27 @@ from fastapi import APIRouter, Depends, Query
 from app.config import get_settings
 from app.dependencies import get_vector_store
 from app.rag import generation, retrieval
-from app.schemas import AskRequest
+from app.schemas import ChatRequest
 from app.store import VectorStore
 
 router = APIRouter()
 
 
-@router.post("/ask")
-def ask(req: AskRequest, store: VectorStore = Depends(get_vector_store)):
-    """Answer a question grounded in the uploaded documents.
+@router.post("/chat")
+def chat(req: ChatRequest, store: VectorStore = Depends(get_vector_store)):
+    """Answer the latest user message, grounded in the uploaded documents.
 
-    embed question -> retrieve top-k chunks -> grounded generation. Returns
-    {answer, sources}, where sources are the chunks the answer actually cited.
+    condense (rewrite the follow-up into a standalone question using history) →
+    embed → retrieve top-k → threshold gate → grounded generation. Returns
+    {answer, sources}; history is used only to resolve the question, never as a
+    source of facts.
     """
     settings = get_settings()
-    embedding = retrieval.embed([req.question])[0]
+    history = [m.model_dump() for m in req.messages[:-1]]
+    latest = req.messages[-1].content
+
+    question = generation.condense_question(history, latest)
+    embedding = retrieval.embed([question])[0]
     results = store.query(embedding, k=req.k)
 
     # Relevance gate: if even the best match is below the similarity threshold,
@@ -28,7 +34,7 @@ def ask(req: AskRequest, store: VectorStore = Depends(get_vector_store)):
         return generation.not_found()
 
     chunks = [chunk for chunk, _score in results]
-    return generation.generate_answer(req.question, chunks)
+    return generation.generate_answer(question, chunks)
 
 
 @router.get("/search")

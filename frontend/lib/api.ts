@@ -7,7 +7,12 @@ export interface Source {
   chunk_index: number;
 }
 
-export interface AskResponse {
+export interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatResponse {
   answer: string;
   sources: Source[];
 }
@@ -65,11 +70,13 @@ export async function uploadFiles(files: File[]): Promise<UploadResponse> {
   return toData<UploadResponse>(res);
 }
 
-export async function ask(question: string): Promise<AskResponse> {
-  const res = await fetch(`${baseUrl()}/ask`, {
+// Send the full (client-held) conversation; the backend answers the last user
+// message grounded in the uploaded docs. History resolves follow-ups.
+export async function chat(messages: Message[]): Promise<ChatResponse> {
+  const res = await fetch(`${baseUrl()}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ messages }),
   });
-  return toData<AskResponse>(res);
+  return toData<ChatResponse>(res);
 }

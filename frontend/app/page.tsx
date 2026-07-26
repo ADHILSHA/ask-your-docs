@@ -1,5 +1,5 @@
 import { UploadPanel } from "@/components/UploadPanel";
-import { AskPanel } from "@/components/AskPanel";
+import { ChatPanel } from "@/components/ChatPanel";
 
 export default function Home() {
   return (
@@ -7,12 +7,13 @@ export default function Home() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">ask-your-docs</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Upload documents, then ask questions answered only from their contents.
+          Upload documents, then chat with them — answers come only from their
+          contents, with sources.
         </p>
       </header>
 
       <UploadPanel />
-      <AskPanel />
+      <ChatPanel />
     </main>
   );
 }

@@ -92,10 +92,15 @@ def client(tmp_path, monkeypatch):
     main.app.dependency_overrides.clear()
 
 
+def _ask(client, text):
+    """Single-turn chat: one user message (no history, so no condensation call)."""
+    return client.post("/chat", json={"messages": [{"role": "user", "content": text}]})
+
+
 def test_answerable_question_returns_grounded_answer_with_sources(client, monkeypatch):
     _mock_llm(monkeypatch, "The office is open on weekdays with staff [1].")
 
-    resp = client.post("/ask", json={"question": "What are the office opening hours?"})
+    resp = _ask(client, "What are the office opening hours?")
     assert resp.status_code == 200
     body = resp.json()
 
@@ -106,7 +111,7 @@ def test_answerable_question_returns_grounded_answer_with_sources(client, monkey
 def test_out_of_scope_question_returns_not_found_and_skips_llm(client, monkeypatch):
     _mock_llm_must_not_be_called(monkeypatch)
 
-    resp = client.post("/ask", json={"question": "How do I bake sourdough bread?"})
+    resp = _ask(client, "How do I bake sourdough bread?")
     assert resp.status_code == 200
     assert resp.json() == {"answer": generation.NOT_FOUND_MESSAGE, "sources": []}
 
@@ -116,9 +121,31 @@ def test_ambiguous_question_returns_clarifying_response_without_sources(client, 
     # the LLM is consulted; we mock it returning a single clarifying question.
     _mock_llm(monkeypatch, "Do you mean paid vacation days or sick days?")
 
-    resp = client.post("/ask", json={"question": "How many days do I get?"})
+    resp = _ask(client, "How many days do I get?")
     assert resp.status_code == 200
     body = resp.json()
 
     assert body["answer"].endswith("?")
     assert body["sources"] == []  # a clarifying question cites nothing
+
+
+def test_followup_is_condensed_then_answered_grounded(client, monkeypatch):
+    # A short follow-up ("and the staff?") is rewritten to a standalone question
+    # via condensation (mocked), then retrieved + answered grounded.
+    monkeypatch.setattr(
+        generation, "condense_question", lambda history, latest: "How many office staff are there?"
+    )
+    _mock_llm(monkeypatch, "The office has staff on weekdays [1].")
+
+    resp = client.post(
+        "/chat",
+        json={
+            "messages": [
+                {"role": "user", "content": "Tell me about the office."},
+                {"role": "assistant", "content": "The office is open on weekdays [1]."},
+                {"role": "user", "content": "and the staff?"},
+            ]
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["sources"] == [{"filename": FIXTURE_NAME, "chunk_index": 0}]

@@ -12,10 +12,14 @@ import pytest
 from fastapi.testclient import TestClient
 from openai import OpenAIError
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 import app.api.routes.documents as documents
 import app.main as main
 import app.rag.retrieval as retrieval
 from app.auth.deps import get_current_user
+from app.db import Base, get_db
 from app.dependencies import get_vector_store
 from app.models.user import User
 from app.store import ChromaVectorStore
@@ -26,8 +30,22 @@ _TEST_USER = User(id="u-test", email="test@example.com", password_hash="x")
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     store = ChromaVectorStore(persist_directory=tmp_path, collection_name="documents")
+    engine = create_engine(
+        f"sqlite:///{tmp_path}/test.db", connect_args={"check_same_thread": False}
+    )
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+    def override_db():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
     main.app.dependency_overrides[get_vector_store] = lambda: store
     main.app.dependency_overrides[get_current_user] = lambda: _TEST_USER
+    main.app.dependency_overrides[get_db] = override_db
     monkeypatch.setattr(retrieval, "embed", lambda texts: [[1.0, 0.0] for _ in texts])
     yield TestClient(main.app)
     main.app.dependency_overrides.clear()

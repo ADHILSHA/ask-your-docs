@@ -1,6 +1,5 @@
 import { AuthGate } from "@/components/AuthGate";
-import { UploadPanel } from "@/components/UploadPanel";
-import { ChatPanel } from "@/components/ChatPanel";
+import { Workspace } from "@/components/Workspace";
 
 export default function Home() {
   return (
@@ -14,8 +13,7 @@ export default function Home() {
       </header>
 
       <AuthGate>
-        <UploadPanel />
-        <ChatPanel />
+        <Workspace />
       </AuthGate>
     </main>
   );

@@ -31,7 +31,7 @@ def chat(
 
     question = generation.condense_question(history, latest)
     embedding = retrieval.embed([question])[0]
-    results = store.query(embedding, k=req.k)
+    results = store.query(current_user.id, embedding, k=req.k)
 
     # Relevance gate: if even the best match is below the similarity threshold,
     # the documents likely don't cover this. Skip the LLM call and return the
@@ -53,7 +53,7 @@ def search(
     """TEMPORARY debug endpoint: embed the question and return the top-k chunks
     with raw similarity scores and metadata. No threshold, no LLM answer."""
     embedding = retrieval.embed([q])[0]
-    results = store.query(embedding, k=k)
+    results = store.query(current_user.id, embedding, k=k)
     return {
         "question": q,
         "results": [

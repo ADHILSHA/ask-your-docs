@@ -5,9 +5,10 @@ Kept separate from domain logic so shapes can evolve independently as the API
 grows. Responses are currently plain dicts; add models here when they need to
 be typed/validated.
 """
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Message(BaseModel):
@@ -27,3 +28,13 @@ class ChatRequest(BaseModel):
         if self.messages[-1].role != "user":
             raise ValueError("the last message must be from the user")
         return self
+
+
+class DocumentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    filename: str
+    char_count: int
+    chunk_count: int
+    created_at: datetime

@@ -1,10 +1,12 @@
 # app/main.py
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from app.chunking import chunk_text
 from app.config import get_settings
 from app.extraction import UnsupportedFileType, extract_text
+from app.generation import generate_answer
 from app.retrieval import embed
 from app.store import ChromaVectorStore, VectorStore
 
@@ -66,6 +68,24 @@ async def upload(files: list[UploadFile] = File(...)):
         "chunks_indexed": total_chunks,
         "message": f"Indexed {total_chunks} chunk(s) from {len(files)} file(s).",
     }
+
+
+class AskRequest(BaseModel):
+    question: str
+    k: int = 5
+
+
+@app.post("/ask")
+def ask(req: AskRequest):
+    """Answer a question grounded in the uploaded documents.
+
+    embed question -> retrieve top-k chunks -> grounded generation. Returns
+    {answer, sources}, where sources are the chunks the answer actually cited.
+    """
+    embedding = embed([req.question])[0]
+    results = store.query(embedding, k=req.k)
+    chunks = [chunk for chunk, _score in results]
+    return generate_answer(req.question, chunks)
 
 
 @app.get("/search")

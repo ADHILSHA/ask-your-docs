@@ -15,8 +15,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 import chromadb
+from chromadb.config import Settings as ChromaSettings
 
-from app.chunking import Chunk
+from app.rag.chunking import Chunk
 
 # Cosine distance in Chroma lands in [0, 2]; we return similarity = 1 - distance
 # so scores are cosine similarity (higher = closer), matching the
@@ -44,6 +45,10 @@ class VectorStore(ABC):
         """Return up to `k` nearest chunks as (chunk, similarity) pairs,
         most similar first."""
 
+    @abstractmethod
+    def reset(self) -> None:
+        """Remove all stored chunks, leaving an empty store."""
+
 
 class ChromaVectorStore(VectorStore):
     def __init__(
@@ -53,9 +58,18 @@ class ChromaVectorStore(VectorStore):
     ) -> None:
         persist_directory = persist_directory or _DEFAULT_PERSIST_DIR
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
-        self._client = chromadb.PersistentClient(path=str(persist_directory))
-        self._collection = self._client.get_or_create_collection(
-            name=collection_name,
+        # Disable Chroma's anonymized telemetry — no background egress from a
+        # process handling user documents.
+        self._client = chromadb.PersistentClient(
+            path=str(persist_directory),
+            settings=ChromaSettings(anonymized_telemetry=False),
+        )
+        self._collection_name = collection_name
+        self._collection = self._open_collection()
+
+    def _open_collection(self):
+        return self._client.get_or_create_collection(
+            name=self._collection_name,
             metadata={"hnsw:space": _DISTANCE_SPACE},
         )
 
@@ -108,3 +122,9 @@ class ChromaVectorStore(VectorStore):
             )
             pairs.append((chunk, 1.0 - distance))
         return pairs
+
+    def reset(self) -> None:
+        # Drop the whole collection and recreate it empty — simpler and more
+        # thorough than deleting ids one by one, and it clears the HNSW index too.
+        self._client.delete_collection(self._collection_name)
+        self._collection = self._open_collection()

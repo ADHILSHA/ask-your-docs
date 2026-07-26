@@ -3,7 +3,7 @@
 assert call-batching and ordering without hitting the network."""
 from types import SimpleNamespace
 
-import app.retrieval as retrieval
+import app.rag.retrieval as retrieval
 
 
 class _FakeEmbeddings:

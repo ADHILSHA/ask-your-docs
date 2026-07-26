@@ -1,5 +1,5 @@
 # tests/test_chunking.py
-from app.chunking import OVERLAP_TOKENS, TARGET_TOKENS, chunk_text, count_tokens
+from app.rag.chunking import OVERLAP_TOKENS, TARGET_TOKENS, chunk_text, count_tokens
 
 
 def _make_text(n_sentences: int) -> str:

@@ -9,12 +9,12 @@ extracts the sources actually cited so callers get {answer, sources}.
 """
 import re
 
-from app.chunking import Chunk
 from app.config import get_settings
+from app.rag.chunking import Chunk
 
 # Reuse the single server-side OpenAI client created for embeddings — same
 # process, same key-from-config. Deliberately shared to avoid a second client.
-from app.retrieval import _client
+from app.rag.retrieval import _client
 
 # Hand-authored contract for the model. Do not edit casually — the citation
 # convention here is what extract_cited_sources() parses, and the fallback

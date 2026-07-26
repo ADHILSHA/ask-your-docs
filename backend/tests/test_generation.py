@@ -3,8 +3,8 @@
 construction and source extraction without hitting the network."""
 from types import SimpleNamespace
 
-import app.generation as generation
-from app.chunking import Chunk
+import app.rag.generation as generation
+from app.rag.chunking import Chunk
 
 CHUNKS = [
     Chunk(text="Refunds are issued within 30 days.", filename="policy.pdf", chunk_index=0),

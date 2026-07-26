@@ -1,6 +1,6 @@
 # tests/test_store.py
 """Store round-trip and reset behavior, against a real Chroma in a tmp dir."""
-from app.chunking import Chunk
+from app.rag.chunking import Chunk
 from app.store import ChromaVectorStore
 
 

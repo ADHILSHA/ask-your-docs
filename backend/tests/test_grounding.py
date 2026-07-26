@@ -9,7 +9,7 @@ mock asserts it is NOT called.
 import os
 import re
 
-# app.main builds Settings (needs a key) and a store at import time.
+# app.main builds Settings (needs a key) via create_app() at import time.
 os.environ.setdefault("OPENAI_API_KEY", "sk-test")
 
 import pytest
@@ -17,8 +17,10 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-import app.generation as generation
 import app.main as main
+import app.rag.generation as generation
+import app.rag.retrieval as retrieval
+from app.dependencies import get_vector_store
 from app.store import ChromaVectorStore
 
 # A single fixture document with two clear topics: office and vacation.
@@ -74,9 +76,11 @@ def _mock_llm_must_not_be_called(monkeypatch):
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
+    # Inject a tmp-dir store via dependency override, and fake embeddings by
+    # patching the module attribute the routes call (retrieval.embed).
     store = ChromaVectorStore(persist_directory=tmp_path, collection_name="documents")
-    monkeypatch.setattr(main, "store", store)
-    monkeypatch.setattr(main, "embed", _fake_embed)
+    main.app.dependency_overrides[get_vector_store] = lambda: store
+    monkeypatch.setattr(retrieval, "embed", _fake_embed)
 
     c = TestClient(main.app)
     resp = c.post(
@@ -84,7 +88,8 @@ def client(tmp_path, monkeypatch):
         files=[("files", (FIXTURE_NAME, FIXTURE_TEXT.encode(), "text/markdown"))],
     )
     assert resp.status_code == 200
-    return c
+    yield c
+    main.app.dependency_overrides.clear()
 
 
 def test_answerable_question_returns_grounded_answer_with_sources(client, monkeypatch):

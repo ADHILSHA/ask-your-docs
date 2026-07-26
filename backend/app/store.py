@@ -16,7 +16,7 @@ from pathlib import Path
 
 import chromadb
 
-from app.chunking import Chunk
+from app.rag.chunking import Chunk
 
 # Cosine distance in Chroma lands in [0, 2]; we return similarity = 1 - distance
 # so scores are cosine similarity (higher = closer), matching the

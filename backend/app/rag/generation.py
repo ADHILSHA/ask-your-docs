@@ -102,7 +102,12 @@ def extract_cited_sources(answer: str, chunks: list[Chunk]) -> list[dict]:
             seen.add(n)
             chunk = chunks[idx]
             sources.append(
-                {"filename": chunk.filename, "chunk_index": chunk.chunk_index}
+                {
+                    "n": n,  # citation number as it appears in the answer text
+                    "filename": chunk.filename,
+                    "chunk_index": chunk.chunk_index,
+                    "document_id": chunk.document_id,
+                }
             )
     return sources
 

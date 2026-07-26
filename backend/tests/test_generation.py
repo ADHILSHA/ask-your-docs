@@ -37,8 +37,8 @@ def test_extract_cited_sources_maps_dedupes_and_ignores_out_of_range():
     answer = "Refunds take 30 days [1]. See also [1] and hours [3]. Bogus [9]."
     sources = generation.extract_cited_sources(answer, CHUNKS)
     assert sources == [
-        {"filename": "policy.pdf", "chunk_index": 0},
-        {"filename": "faq.md", "chunk_index": 0},
+        {"n": 1, "filename": "policy.pdf", "chunk_index": 0, "document_id": None},
+        {"n": 3, "filename": "faq.md", "chunk_index": 0, "document_id": None},
     ]
 
 
@@ -52,7 +52,7 @@ def test_generate_answer_returns_answer_and_cited_sources(monkeypatch):
     result = generation.generate_answer("What are the support hours?", CHUNKS)
 
     assert result["answer"] == "Support is available 9 to 5 [3]."
-    assert result["sources"] == [{"filename": "faq.md", "chunk_index": 0}]
+    assert result["sources"] == [{"n": 3, "filename": "faq.md", "chunk_index": 0, "document_id": None}]
     # the hand-written system prompt must be passed through untouched
     assert capture["messages"][0]["role"] == "system"
     assert capture["messages"][0]["content"] == generation.SYSTEM_PROMPT

@@ -100,6 +100,36 @@ def test_cannot_download_another_users_file(client):
     assert client.get(f"/documents/{bob_doc['id']}/download", headers=alice).status_code == 404
 
 
+def test_upload_tags_document_with_conversation(client):
+    alice = _signup(client, "alice@example.com")
+    conv_id = client.post("/conversations", headers=alice).json()["id"]
+
+    r = client.post(
+        "/upload",
+        headers=alice,
+        data={"conversation_id": conv_id},
+        files=[("files", ("cats.txt", b"cats are pets", "text/plain"))],
+    )
+    assert r.status_code == 200
+
+    doc = client.get("/documents", headers=alice).json()[0]
+    assert doc["conversation_id"] == conv_id
+
+
+def test_upload_rejects_another_users_conversation(client):
+    alice = _signup(client, "alice@example.com")
+    bob = _signup(client, "bob@example.com")
+    bob_conv = client.post("/conversations", headers=bob).json()["id"]
+
+    r = client.post(
+        "/upload",
+        headers=alice,
+        data={"conversation_id": bob_conv},
+        files=[("files", ("cats.txt", b"cats are pets", "text/plain"))],
+    )
+    assert r.status_code == 404
+
+
 def test_documents_requires_auth(client):
     assert client.get("/documents").status_code == 401
 

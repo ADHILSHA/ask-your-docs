@@ -6,20 +6,19 @@ export function DocumentsPanel({
   documents,
   onDelete,
   onDownload,
+  emptyMessage = "No documents yet — upload one above.",
 }: {
   documents: DocumentInfo[] | null;
   onDelete: (id: string) => void;
   onDownload: (id: string, filename: string) => void;
+  emptyMessage?: string;
 }) {
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-      <h2 className="text-sm font-medium">Your documents</h2>
+    <div className="flex flex-col gap-3">
       {documents === null ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
       ) : documents.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          No documents yet — upload one above.
-        </p>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">{emptyMessage}</p>
       ) : (
         <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
           {documents.map((d) => (
@@ -48,6 +47,6 @@ export function DocumentsPanel({
           ))}
         </ul>
       )}
-    </section>
+    </div>
   );
 }

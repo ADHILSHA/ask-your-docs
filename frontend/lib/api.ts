@@ -3,8 +3,10 @@
 // the only public env var. No keys here: the backend owns every LLM call.
 
 export interface Source {
+  n: number; // citation number as it appears in the answer text, e.g. [2]
   filename: string;
   chunk_index: number;
+  document_id: string | null;
 }
 
 export interface ChatResponse {
@@ -40,6 +42,7 @@ export interface UploadResponse {
 
 export interface DocumentInfo {
   id: string;
+  conversation_id: string | null;
   filename: string;
   char_count: number;
   chunk_count: number;
@@ -101,10 +104,16 @@ async function toData<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function uploadFiles(files: File[]): Promise<UploadResponse> {
+export async function uploadFiles(
+  files: File[],
+  conversationId?: string | null,
+): Promise<UploadResponse> {
   const form = new FormData();
   for (const file of files) {
     form.append("files", file);
+  }
+  if (conversationId) {
+    form.append("conversation_id", conversationId);
   }
   const res = await fetch(`${baseUrl()}/upload`, {
     method: "POST",
@@ -207,4 +216,20 @@ export async function downloadDocument(id: string, filename: string): Promise<vo
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+// Open a document in a new tab for viewing (inline). Needs the Bearer header,
+// so fetch the bytes and open an object URL rather than linking the URL directly.
+export async function openDocument(documentId: string): Promise<void> {
+  const res = await fetch(`${baseUrl()}/documents/${documentId}/download`, {
+    headers: { ...authHeaders() },
+  });
+  if (res.status === 401) clearToken();
+  if (!res.ok) throw new Error(`Could not open document (${res.status})`);
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener");
+  // Revoke later so the opened tab has time to load it.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

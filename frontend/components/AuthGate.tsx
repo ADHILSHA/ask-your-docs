@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { clearToken, getToken } from "@/lib/api";
+import { getToken } from "@/lib/api";
 import { AuthForm } from "@/components/AuthForm";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
@@ -18,24 +18,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   if (authed === null) return null;
 
   if (!authed) {
-    return <AuthForm onAuthed={() => setAuthed(true)} />;
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <AuthForm onAuthed={() => setAuthed(true)} />
+      </div>
+    );
   }
 
-  return (
-    <>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => {
-            clearToken();
-            setAuthed(false);
-          }}
-          className="text-sm text-zinc-500 underline dark:text-zinc-400"
-        >
-          Log out
-        </button>
-      </div>
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

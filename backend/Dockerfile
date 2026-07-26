@@ -21,6 +21,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Render sets $PORT (defaults to 10000 there). Shell form so the variable
-# expands; fall back to 8000 for a local `docker run`.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Apply DB migrations, then start. Render sets $PORT (defaults to 10000 there);
+# shell form so the variable expands, with an 8000 fallback for local runs.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

@@ -128,6 +128,13 @@ def _ask(client, text):
     return client.post("/chat", json={"conversation_id": conv["id"], "message": text})
 
 
+def _assert_fixture_source(source):
+    assert source["n"] == 1  # the [1] citation in the answer
+    assert source["filename"] == FIXTURE_NAME
+    assert source["chunk_index"] == 0
+    assert source["document_id"]  # a real document id, threaded through for links
+
+
 def test_answerable_question_returns_grounded_answer_with_sources(client, monkeypatch):
     _mock_llm(monkeypatch, "The office is open on weekdays with staff [1].")
 
@@ -136,7 +143,8 @@ def test_answerable_question_returns_grounded_answer_with_sources(client, monkey
     body = resp.json()
 
     assert body["answer"] != generation.NOT_FOUND_MESSAGE
-    assert body["sources"] == [{"filename": FIXTURE_NAME, "chunk_index": 0}]
+    assert len(body["sources"]) == 1
+    _assert_fixture_source(body["sources"][0])
 
 
 def test_out_of_scope_question_returns_not_found_and_skips_llm(client, monkeypatch):
@@ -174,7 +182,7 @@ def test_followup_is_condensed_then_answered_grounded(client, monkeypatch):
     )
     resp = client.post("/chat", json={"conversation_id": conv, "message": "and the staff?"})
     assert resp.status_code == 200
-    assert resp.json()["sources"] == [{"filename": FIXTURE_NAME, "chunk_index": 0}]
+    _assert_fixture_source(resp.json()["sources"][0])
 
 
 def test_chat_persists_messages_to_the_conversation(client, monkeypatch):
@@ -185,4 +193,4 @@ def test_chat_persists_messages_to_the_conversation(client, monkeypatch):
     msgs = client.get(f"/conversations/{conv}/messages").json()
     assert [m["role"] for m in msgs] == ["user", "assistant"]
     assert msgs[0]["content"] == "office hours?"
-    assert msgs[1]["sources"] == [{"filename": FIXTURE_NAME, "chunk_index": 0}]
+    _assert_fixture_source(msgs[1]["sources"][0])

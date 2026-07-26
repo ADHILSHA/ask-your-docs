@@ -137,6 +137,7 @@ class ChromaVectorStore(VectorStore):
                 text=text,
                 filename=meta["filename"],
                 chunk_index=meta["chunk_index"],
+                document_id=meta.get("document_id"),
             )
             pairs.append((chunk, 1.0 - distance))
         return pairs

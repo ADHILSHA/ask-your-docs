@@ -1,10 +1,22 @@
 # app/api/routes/documents.py
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
+import mimetypes
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.db import get_db
 from app.dependencies import get_document_storage, get_vector_store
+from app.models.conversation import Conversation
 from app.models.document import Document
 from app.models.user import User
 from app.rag import retrieval
@@ -26,6 +38,7 @@ MAX_FILES = 20  # per request
 @router.post("/upload")
 async def upload(
     files: list[UploadFile] = File(...),
+    conversation_id: str | None = Form(None),
     store: VectorStore = Depends(get_vector_store),
     storage: DocumentStorage = Depends(get_document_storage),
     db: Session = Depends(get_db),
@@ -42,6 +55,12 @@ async def upload(
             status_code=400,
             detail=f"Too many files: {len(files)} (max {MAX_FILES} per request).",
         )
+
+    # If tagging to a conversation, it must belong to the caller.
+    if conversation_id is not None:
+        conversation = db.get(Conversation, conversation_id)
+        if conversation is None or conversation.user_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Pass 1 — read, size-check, and extract text. No writes yet; we keep the
     # raw bytes so pass 2 can persist the original file.
@@ -76,6 +95,7 @@ async def upload(
         chunks = chunk_text(text, filename)
         document = Document(
             user_id=current_user.id,
+            conversation_id=conversation_id,
             filename=filename or "untitled",
             char_count=len(text),
             chunk_count=len(chunks),
@@ -136,10 +156,13 @@ def download_document(
         raise HTTPException(status_code=404, detail="File not available")
 
     data = storage.load(document.s3_key)
+    media_type = mimetypes.guess_type(document.filename)[0] or "application/octet-stream"
+    # inline so it can be viewed in a browser tab; the frontend's download
+    # button forces a save regardless via the anchor's `download` attribute.
     return Response(
         content=data,
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{document.filename}"'},
+        media_type=media_type,
+        headers={"Content-Disposition": f'inline; filename="{document.filename}"'},
     )
 
 

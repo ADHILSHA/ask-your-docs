@@ -37,6 +37,8 @@ class Chunk:
     text: str
     filename: str
     chunk_index: int
+    # Assigned at store time (not at chunking); lets citations link to the doc.
+    document_id: str | None = None
 
 
 def count_tokens(text: str) -> int:

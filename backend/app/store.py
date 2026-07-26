@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 import chromadb
+from chromadb.config import Settings as ChromaSettings
 
 from app.rag.chunking import Chunk
 
@@ -57,7 +58,12 @@ class ChromaVectorStore(VectorStore):
     ) -> None:
         persist_directory = persist_directory or _DEFAULT_PERSIST_DIR
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
-        self._client = chromadb.PersistentClient(path=str(persist_directory))
+        # Disable Chroma's anonymized telemetry — no background egress from a
+        # process handling user documents.
+        self._client = chromadb.PersistentClient(
+            path=str(persist_directory),
+            settings=ChromaSettings(anonymized_telemetry=False),
+        )
         self._collection_name = collection_name
         self._collection = self._open_collection()
 

@@ -33,8 +33,8 @@ def ask(req: AskRequest, store: VectorStore = Depends(get_vector_store)):
 
 @router.get("/search")
 def search(
-    q: str = Query(..., description="Question to retrieve chunks for"),
-    k: int = 5,
+    q: str = Query(..., min_length=1, description="Question to retrieve chunks for"),
+    k: int = Query(5, ge=1, le=20),
     store: VectorStore = Depends(get_vector_store),
 ):
     """TEMPORARY debug endpoint: embed the question and return the top-k chunks

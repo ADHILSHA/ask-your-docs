@@ -1,45 +1,43 @@
 # Design note
 
 ## How I decomposed the problem
-I built in narrow, verifiable slices rather than generating the pipeline in one
-pass — each slice one concern, tested before the next:
+I built in narrow, verifiable slices — one concern per change, tested before the
+next. First the single-user RAG core, then multi-user on top of it:
 
-1. Config + `/health` (typed settings, CORS from env)
-2. Upload → **extract** text (pypdf / plain-text)
-3. **Chunk** the text (token-sized, overlapping)
-4. **Embed + store** (Chroma) and persist on upload
-5. **Retrieve** (top-k by cosine similarity)
-6. **Generate** grounded answers with citations
-7. Threshold gate, frontend UI, deploy config, hardening
+1. Config + `/health`; **extract** (pypdf / text) → **chunk** → **embed + store**
+   (Chroma) → **retrieve** → **generate** grounded answers with citations.
+2. Similarity-threshold gate and the grounding contract (unanswerable / ambiguous).
+3. Conversational chat (server-persisted history, query condensation).
+4. Multi-user: accounts → per-user isolation → R2 file storage → per-conversation
+   document context.
 
-This kept every decision reviewable and let the failure modes (unanswerable /
-ambiguous questions) drive the tests.
+Failure modes (unanswerable, ambiguous, cross-user access) drove the tests.
 
 ## Key decisions
-- **RAG, no fine-tuning / no framework.** The task is grounded Q&A over
-  user-supplied docs — retrieval + a tight prompt is the right tool. I avoided
-  LangChain/LlamaIndex so the retrieval and prompt logic stay owned and
-  explainable ("why did you do this?" has a real answer at every line).
-- **Chroma in-process over pgvector/Pinecone.** At this scale a local,
-  persistent, embedded vector store means zero external services, zero network
-  hops, and nothing to provision. I hid it behind a `VectorStore` ABC, so
-  swapping to pgvector/hosted Chroma later is one new subclass, not a rewrite.
-- **Single-user, no auth.** A deliberate scope cut: it removes a large surface
-  (sessions, tenancy, a user DB) that adds nothing to demonstrating grounded
-  retrieval. The cost — one shared store — is documented, not hidden.
-- **Chunking: ~600 tokens, ~15% overlap, boundary-aware.** Split on paragraphs,
-  fall back to sentences, and **never break mid-sentence** (accepting an
-  occasional oversized chunk over a severed one). Overlap preserves context
-  across boundaries. Token counts use tiktoken `cl100k_base` to match the
-  embedding model's view.
-- **Similarity threshold (0.35) as a grounding gate.** If the top match scores
-  below it, skip the LLM entirely and return the fixed fallback
-  *"I couldn't find this in the documents."* — cheaper and safer than letting
-  the model answer from weak matches. Sources returned are only the chunks the
-  answer actually cited.
+- **RAG, no framework.** Retrieval, prompting, condensation, and citation parsing
+  stay owned and explainable — no LangChain/LlamaIndex abstracting them away.
+- **Chroma in-process, isolated by metadata filter.** No external vector DB;
+  every chunk carries `user_id` + `document_id`, and every query filters by them.
+  A `VectorStore` ABC keeps it swappable (pgvector/hosted later = one subclass).
+- **Three stores, three interfaces.** Postgres (identity, ownership,
+  conversations) via SQLAlchemy + **Alembic** migrations; Cloudflare R2 (raw
+  files) behind a `DocumentStorage` ABC (Local for dev); Chroma (vectors). Each
+  is swappable and independently testable.
+- **Minimal auth.** Email/password, bcrypt hashing, stateless JWT (bearer) — no
+  email verification/reset, a deliberate scope cut. Keys stay server-side.
+- **Per-conversation context.** A chat answers only from documents added to it
+  (a many-to-many link); retrieval is scoped to that set. Precise grounding, and
+  documents are reusable across chats.
+- **Chunking:** ~600 tokens, ~15% overlap, boundary-aware, never mid-sentence;
+  tiktoken `cl100k_base` to match the embedder. **Threshold 0.35** as the
+  grounding gate — below it, skip the LLM and return the fixed fallback.
+- **Query condensation** for follow-ups: history rewrites the question into a
+  standalone query for retrieval; the *answer* is history-free, so it stays
+  grounded in freshly retrieved context (and citations stay clean).
 
 ## What I deferred
-Streaming, reranking, and hybrid (keyword+vector) search — noted, not silently
-skipped. Also deferred: multi-user/tenancy, S3 document storage, per-chunk
-relevance filtering, and durable persistence on the live demo (Render's disk is
-ephemeral). Reasons for each are in `self-review.md`.
+Reranking, hybrid (keyword+vector) search, and streaming — noted, not silently
+skipped. Also deferred: per-user rate limiting, filename sanitization, bounded
+conversation history, orphan cleanup on failed uploads, OCR, and presigned
+downloads. Reasons and severities are in `self-review.md`; the multi-user
+architecture is in `multiuser-plan.md`.

@@ -1,5 +1,11 @@
 # Plan: multi-user (email/password) + per-user docs (S3) + persistent chat
 
+> **Status: implemented.** Milestones A–D are built and tested (auth, per-user
+> retrieval, R2 file storage, persistent conversations), plus per-conversation
+> document context beyond the original plan. This doc is kept as the design
+> record; deferred hardening (rate limiting, `JWT_SECRET` enforcement, filename
+> sanitization, bounded history) is tracked in `self-review.md`.
+
 Add simple accounts so each user has their own documents and conversations.
 Deliberately minimal auth: email + password, **no email verification, no reset,
 no OAuth**. This is a real architectural step up from the single-user demo.
@@ -99,7 +105,7 @@ app/
 `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, optional
 `S3_ENDPOINT` for R2-compatible). Keep `.env.example` in sync.
 
-## Milestones (each shippable, tests green)
+## Milestones (each shippable, tests green) — ✅ all done
 - **A — Auth + DB:** users table, signup/login, JWT, `get_current_user`; guard
   existing routes. (No retrieval changes yet — one shared store still, but gated.)
 - **B — Per-user retrieval:** `user_id` in chunk metadata + filtered queries +

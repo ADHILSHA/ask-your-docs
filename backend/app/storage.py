@@ -8,6 +8,7 @@ original *file bytes* — distinct from `store.py`, which holds the vector chunk
 Keys are `"{user_id}/{document_id}/{filename}"`, which keeps every user's files
 in their own prefix.
 """
+import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -16,7 +17,10 @@ _DEFAULT_LOCAL_DIR = Path(__file__).resolve().parent.parent / ".storage"
 
 
 def build_key(user_id: str, document_id: str, filename: str) -> str:
-    return f"{user_id}/{document_id}/{filename}"
+    # Use only the basename so a malicious filename (e.g. "../../x") can't
+    # escape the user/document prefix on local disk. Handle both separators.
+    safe_name = os.path.basename(filename.replace("\\", "/")) or "file"
+    return f"{user_id}/{document_id}/{safe_name}"
 
 
 class DocumentStorage(ABC):

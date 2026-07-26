@@ -1,5 +1,9 @@
 # Plan: conversational (multi-turn) chat
 
+> **Status: implemented.** M1 (multi-turn) and M2 (query condensation) are built;
+> chat is server-persisted per conversation. M3 polish (history truncation,
+> streaming) is deferred — see `self-review.md`.
+
 Turn the single-shot "ask one question, get one answer" flow into a chat where
 the user can have a back-and-forth — follow-ups, and answering the app's
 clarifying questions — while keeping every answer grounded in retrieved context.

@@ -94,11 +94,6 @@ def test_chat_unknown_conversation_404(client):
     assert _chat(client, {"conversation_id": "does-not-exist", "message": "hi"}).status_code == 404
 
 
-def test_search_validates_params(client):
-    assert client.get("/search", params={"q": "hi", "k": 0}).status_code == 422
-    assert client.get("/search").status_code == 422  # q required
-
-
 def test_openai_error_maps_to_502(client, monkeypatch):
     def boom(*a, **k):
         raise OpenAIError("simulated outage")

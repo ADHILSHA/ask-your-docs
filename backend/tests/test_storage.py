@@ -3,6 +3,13 @@
 from app.storage import LocalStorage, build_key
 
 
+def test_build_key_sanitizes_filename():
+    # A malicious filename can't escape the user/document prefix.
+    assert build_key("u", "d", "../../../etc/passwd") == "u/d/passwd"
+    assert build_key("u", "d", "..\\..\\win.txt") == "u/d/win.txt"
+    assert build_key("u", "d", "normal.pdf") == "u/d/normal.pdf"
+
+
 def test_save_load_delete(tmp_path):
     storage = LocalStorage(base_dir=tmp_path)
     key = storage.save("u1", "d1", "notes.txt", b"hello bytes")

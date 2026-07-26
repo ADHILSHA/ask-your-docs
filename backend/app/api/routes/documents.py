@@ -110,9 +110,12 @@ async def upload(
         if conversation is not None:
             conversation.documents.append(document)
 
-        document.s3_key = storage.save(
-            current_user.id, document.id, document.filename, data
-        )
+        try:
+            document.s3_key = storage.save(
+                current_user.id, document.id, document.filename, data
+            )
+        except Exception:
+            raise HTTPException(status_code=502, detail="File storage error. Please try again.")
 
         if chunks:
             embeddings = retrieval.embed([c.text for c in chunks])
@@ -162,7 +165,10 @@ def download_document(
     if not document.s3_key:
         raise HTTPException(status_code=404, detail="File not available")
 
-    data = storage.load(document.s3_key)
+    try:
+        data = storage.load(document.s3_key)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not retrieve the file.")
     media_type = mimetypes.guess_type(document.filename)[0] or "application/octet-stream"
     # inline so it can be viewed in a browser tab; the frontend's download
     # button forces a save regardless via the anchor's `download` attribute.

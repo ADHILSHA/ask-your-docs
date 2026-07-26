@@ -7,7 +7,11 @@ so `openai_api_key` reads `OPENAI_API_KEY`. See .env.example.
 """
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# The placeholder JWT secret shipped for local dev — must never reach production.
+DEV_JWT_SECRET = "dev-secret-change-me"
 
 
 class Settings(BaseSettings):
@@ -40,8 +44,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./ask_your_docs.db"
 
     # Auth. JWT_SECRET MUST be overridden with a strong random value in
-    # production — the default is a dev placeholder only.
-    jwt_secret: str = "dev-secret-change-me"
+    # production — the default is a dev placeholder only (see the validator below).
+    jwt_secret: str = DEV_JWT_SECRET
     jwt_expire_minutes: int = 60 * 24  # 1 day
 
     # Raw-file storage. "local" writes to disk (dev); "s3" uses Cloudflare R2
@@ -56,6 +60,18 @@ class Settings(BaseSettings):
     @property
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    @model_validator(mode="after")
+    def _require_strong_jwt_secret_in_prod(self) -> "Settings":
+        # Fail fast rather than silently accept a forgeable default token. Treat
+        # Postgres or S3/R2 as a production signal (local dev uses SQLite + local).
+        is_prod = self.database_url.startswith("postgres") or self.storage_backend == "s3"
+        if is_prod and self.jwt_secret == DEV_JWT_SECRET:
+            raise ValueError(
+                "JWT_SECRET is still the dev default in a production configuration. "
+                "Set a strong random value (e.g. `openssl rand -hex 32`)."
+            )
+        return self
 
 
 @lru_cache

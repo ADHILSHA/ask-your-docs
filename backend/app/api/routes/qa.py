@@ -1,5 +1,5 @@
 # app/api/routes/qa.py
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -14,6 +14,10 @@ from app.schemas import ChatRequest
 from app.store import VectorStore
 
 router = APIRouter()
+
+# Cap how many prior messages feed condensation, so a long conversation can't
+# grow the prompt (and cost) without bound.
+_HISTORY_LIMIT = 20
 
 
 @router.post("/chat")
@@ -36,12 +40,15 @@ def chat(
     if conversation is None or conversation.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    prior = (
+    # Most recent messages, capped, then back into chronological order.
+    recent = (
         db.query(Message)
         .filter(Message.conversation_id == conversation.id)
-        .order_by(Message.created_at)
+        .order_by(Message.created_at.desc())
+        .limit(_HISTORY_LIMIT)
         .all()
     )
+    prior = list(reversed(recent))
     history = [{"role": m.role, "content": m.content} for m in prior]
 
     # Name a fresh conversation after its first message.
@@ -91,28 +98,3 @@ def chat(
     )
     db.commit()
     return answer
-
-
-@router.get("/search")
-def search(
-    q: str = Query(..., min_length=1, description="Question to retrieve chunks for"),
-    k: int = Query(5, ge=1, le=20),
-    store: VectorStore = Depends(get_vector_store),
-    current_user: User = Depends(get_current_user),
-):
-    """TEMPORARY debug endpoint: embed the question and return the top-k chunks
-    with raw similarity scores and metadata. No threshold, no LLM answer."""
-    embedding = retrieval.embed([q])[0]
-    results = store.query(current_user.id, embedding, k=k)
-    return {
-        "question": q,
-        "results": [
-            {
-                "score": score,
-                "filename": chunk.filename,
-                "chunk_index": chunk.chunk_index,
-                "text": chunk.text,
-            }
-            for chunk, score in results
-        ],
-    }

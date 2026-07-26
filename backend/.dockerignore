@@ -1,0 +1,13 @@
+# Keep the build context small and secrets out of the image.
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.chroma/
+tests/
+.env
+.env.*
+!.env.example
+Dockerfile
+.dockerignore
+.python-version

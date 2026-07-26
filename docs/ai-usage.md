@@ -17,8 +17,8 @@ assistant's defaults:
 - **Single-user first, then a deliberate expansion to multi-user.** I started
   single-user (no auth, no external DB) to keep the RAG core focused, then chose
   when to add accounts, per-user isolation, R2 storage, and per-conversation
-  context — writing the plan first (`multiuser-plan.md`) and building it in
-  phased, testable milestones rather than all at once.
+  context — writing the plan down first and building it in phased, testable
+  milestones rather than all at once.
 - **Multi-user architecture:** Postgres for identity/ownership, Cloudflare R2 for
   files (behind a `DocumentStorage` interface), JWT-in-localStorage for auth
   (accepting the XSS trade-off for simplicity), and **per-conversation document

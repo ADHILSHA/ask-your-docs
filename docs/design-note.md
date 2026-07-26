@@ -37,7 +37,6 @@ Failure modes (unanswerable, ambiguous, cross-user access) drove the tests.
 
 ## What I deferred
 Reranking, hybrid (keyword+vector) search, and streaming — noted, not silently
-skipped. Also deferred: per-user rate limiting, filename sanitization, bounded
-conversation history, orphan cleanup on failed uploads, OCR, and presigned
-downloads. Reasons and severities are in `self-review.md`; the multi-user
-architecture is in `multiuser-plan.md`.
+skipped. Also deferred: per-user rate limiting, orphan cleanup on failed
+uploads, OCR, and presigned downloads. Reasons and severities are in
+`self-review.md`.

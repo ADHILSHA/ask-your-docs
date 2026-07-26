@@ -44,8 +44,8 @@ clear decisions and honest trade-offs over feature count or polish.
   citations are a scored requirement, not a nice-to-have.
 - **Do not modify the system prompt in `generation.py`** without being
   asked explicitly — it's hand-written and reviewed, not a draft.
-- **Multi-user with email/password auth is the current direction** (see
-  `docs/multiuser-plan.md`). Postgres (Render) is the source of truth for
+- **Multi-user with email/password auth is the current direction.**
+  Postgres (Render) is the source of truth for
   identity, document ownership, and conversations; Cloudflare R2 stores raw
   uploaded files. Passwords are bcrypt-hashed; JWTs are signed with a
   server-side secret. All secrets stay server-side.

@@ -64,13 +64,11 @@ npm run dev                    # http://localhost:3000
 ## Deploy
 - **Backend → Render** (Docker): the image runs `alembic upgrade head` then
   uvicorn on `$PORT`. Set env vars (incl. a **strong `JWT_SECRET`**, Postgres
-  `DATABASE_URL`, R2 credentials). See `docs/multiuser-plan.md`.
+  `DATABASE_URL`, R2 credentials, and optionally `CHROMA_*` for durable vectors).
 - **Frontend → Vercel**: root directory `frontend`, set `NEXT_PUBLIC_API_URL`.
 
 ## Deliverables & docs
 - `docs/design-note.md` — decomposition, key decisions, deferrals
 - `docs/ai-usage.md` — what was decided vs. delegated to AI
 - `docs/self-review.md` — trade-offs, findings by severity, next steps
-- `docs/multiuser-plan.md` — the multi-user architecture (auth, R2, context)
-- `docs/chat-plan.md` — the conversational design
 - `.claude/skills/grounding/SKILL.md` — the grounding/citation contract

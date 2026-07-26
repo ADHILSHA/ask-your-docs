@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from app.chunking import chunk_text
 from app.config import get_settings
 from app.extraction import UnsupportedFileType, extract_text
-from app.generation import generate_answer
+from app.generation import generate_answer, not_found
 from app.retrieval import embed
 from app.store import ChromaVectorStore, VectorStore
 
@@ -84,6 +84,13 @@ def ask(req: AskRequest):
     """
     embedding = embed([req.question])[0]
     results = store.query(embedding, k=req.k)
+
+    # Relevance gate: if even the best match is below the similarity threshold,
+    # the documents likely don't cover this. Skip the LLM call and return the
+    # grounded fallback rather than risk an ungrounded answer from weak matches.
+    if not results or results[0][1] < settings.similarity_threshold:
+        return not_found()
+
     chunks = [chunk for chunk, _score in results]
     return generate_answer(req.question, chunks)
 

@@ -27,7 +27,16 @@ Follow these rules exactly:
 3. When you do answer, cite the numbered sources you used inline using their bracket numbers, for example [1] or [2][3]. Cite only the sources you actually relied on.
 4. Keep the answer concise and grounded in the cited context."""
 
+# The one grounded fallback string, used both when nothing is retrieved / the
+# top match is too weak, and (per the prompt) when the model can't answer.
+NOT_FOUND_MESSAGE = "I couldn't find this in the documents."
+
 _CITATION_RE = re.compile(r"\[(\d+)\]")
+
+
+def not_found() -> dict:
+    """The grounded fallback response: fixed message, no sources."""
+    return {"answer": NOT_FOUND_MESSAGE, "sources": []}
 
 
 def build_context(chunks: list[Chunk]) -> str:
@@ -67,7 +76,7 @@ def generate_answer(question: str, chunks: list[Chunk]) -> dict:
     # Nothing retrieved -> nothing to ground in. Return the fallback directly
     # rather than spend a chat call to be told the same thing.
     if not chunks:
-        return {"answer": "I couldn't find this in the documents.", "sources": []}
+        return not_found()
 
     context = build_context(chunks)
     user_message = f"Numbered context:\n{context}\n\nQuestion: {question}"

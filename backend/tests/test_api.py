@@ -12,17 +12,42 @@ import pytest
 from fastapi.testclient import TestClient
 from openai import OpenAIError
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 import app.api.routes.documents as documents
 import app.main as main
 import app.rag.retrieval as retrieval
-from app.dependencies import get_vector_store
+from app.auth.deps import get_current_user
+from app.db import Base, get_db
+from app.dependencies import get_document_storage, get_vector_store
+from app.models.user import User
+from app.storage import LocalStorage
 from app.store import ChromaVectorStore
+
+_TEST_USER = User(id="u-test", email="test@example.com", password_hash="x")
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     store = ChromaVectorStore(persist_directory=tmp_path, collection_name="documents")
+    engine = create_engine(
+        f"sqlite:///{tmp_path}/test.db", connect_args={"check_same_thread": False}
+    )
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+    def override_db():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
     main.app.dependency_overrides[get_vector_store] = lambda: store
+    main.app.dependency_overrides[get_current_user] = lambda: _TEST_USER
+    main.app.dependency_overrides[get_db] = override_db
+    main.app.dependency_overrides[get_document_storage] = lambda: LocalStorage(tmp_path / "storage")
     monkeypatch.setattr(retrieval, "embed", lambda texts: [[1.0, 0.0] for _ in texts])
     yield TestClient(main.app)
     main.app.dependency_overrides.clear()
@@ -51,14 +76,22 @@ def test_too_many_files_rejected(client, monkeypatch):
     assert "Too many files" in resp.json()["detail"]
 
 
-def test_ask_rejects_blank_question(client):
-    assert client.post("/ask", json={"question": "   "}).status_code == 200  # trimmed? no—non-empty string
-    assert client.post("/ask", json={"question": ""}).status_code == 422
+def _chat(client, body):
+    return client.post("/chat", json=body)
 
 
-def test_ask_rejects_out_of_range_k(client):
-    assert client.post("/ask", json={"question": "hi", "k": 0}).status_code == 422
-    assert client.post("/ask", json={"question": "hi", "k": 9999}).status_code == 422
+def test_chat_rejects_blank_message(client):
+    assert _chat(client, {"conversation_id": "x", "message": ""}).status_code == 422
+
+
+def test_chat_rejects_out_of_range_k(client):
+    assert _chat(client, {"conversation_id": "x", "message": "hi", "k": 0}).status_code == 422
+    assert _chat(client, {"conversation_id": "x", "message": "hi", "k": 9999}).status_code == 422
+
+
+def test_chat_unknown_conversation_404(client):
+    # Valid body + auth, but the conversation doesn't exist for this user.
+    assert _chat(client, {"conversation_id": "does-not-exist", "message": "hi"}).status_code == 404
 
 
 def test_search_validates_params(client):

@@ -19,7 +19,7 @@ from app.rag.retrieval import _client
 # Hand-authored contract for the model. Do not edit casually — the citation
 # convention here is what extract_cited_sources() parses, and the fallback
 # string is asserted verbatim elsewhere.
-SYSTEM_PROMPT = """You are a question-answering assistant. Answer using ONLY the numbered context provided in the user message. Do not use any outside knowledge.
+SYSTEM_PROMPT = """You are a question-answering assistant in a conversation with a user. Answer using ONLY the numbered context provided in the user message. Do not use any outside knowledge, and do not treat earlier turns of the conversation as a source of facts — every answer must be grounded in the numbered context below.
 
 Follow these rules exactly:
 1. If the context does not contain the answer, reply with exactly this sentence and nothing else: I couldn't find this in the documents.
@@ -37,6 +37,42 @@ _CITATION_RE = re.compile(r"\[(\d+)\]")
 def not_found() -> dict:
     """The grounded fallback response: fixed message, no sources."""
     return {"answer": NOT_FOUND_MESSAGE, "sources": []}
+
+
+# Rewrites a conversational follow-up into a self-contained question so
+# retrieval works on it. This is a separate concern from the grounding prompt
+# above and never sees the documents — it only resolves references.
+CONDENSE_PROMPT = """You rewrite a user's latest message into a standalone question.
+
+Given the conversation so far and the latest message, rewrite the latest message as a single question that can be understood on its own, without the conversation — resolving references like "it", "that", or a short reply to a previous clarifying question. If the latest message is already standalone, return it unchanged. Return only the rewritten question, with no preamble."""
+
+
+def condense_question(history: list[dict], latest: str) -> str:
+    """Rewrite `latest` into a standalone question using prior turns.
+
+    `history` is the conversation before the latest message ([{role, content}]).
+    With no history there's nothing to resolve, so return it unchanged and skip
+    the extra model call.
+    """
+    if not history:
+        return latest
+
+    conversation = "\n".join(f"{m['role']}: {m['content']}" for m in history)
+    response = _client().chat.completions.create(
+        model=get_settings().chat_model,
+        messages=[
+            {"role": "system", "content": CONDENSE_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f"Conversation so far:\n{conversation}\n\n"
+                    f"Latest message: {latest}\n\nStandalone question:"
+                ),
+            },
+        ],
+        temperature=0,
+    )
+    return (response.choices[0].message.content or "").strip() or latest
 
 
 def build_context(chunks: list[Chunk]) -> str:

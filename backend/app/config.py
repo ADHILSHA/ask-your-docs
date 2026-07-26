@@ -35,6 +35,24 @@ class Settings(BaseSettings):
     # JSON-decode a `list[str]` env value and choke on the comma form.
     allowed_origins: str = "http://localhost:3000"
 
+    # Database. Defaults to a local SQLite file so the app runs with no external
+    # DB in dev; Render sets a Postgres URL. Same SQLAlchemy code either way.
+    database_url: str = "sqlite:///./ask_your_docs.db"
+
+    # Auth. JWT_SECRET MUST be overridden with a strong random value in
+    # production — the default is a dev placeholder only.
+    jwt_secret: str = "dev-secret-change-me"
+    jwt_expire_minutes: int = 60 * 24  # 1 day
+
+    # Raw-file storage. "local" writes to disk (dev); "s3" uses Cloudflare R2
+    # (S3-compatible). R2 vars are only needed when storage_backend == "s3".
+    storage_backend: str = "local"
+    s3_bucket: str = ""
+    s3_endpoint: str = ""  # R2 endpoint, e.g. https://<account>.r2.cloudflarestorage.com
+    s3_region: str = "auto"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+
     @property
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]

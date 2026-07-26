@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { uploadFiles } from "@/lib/api";
 
-export function UploadPanel() {
+export function UploadPanel({ onUploaded }: { onUploaded?: () => void }) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
@@ -18,6 +18,7 @@ export function UploadPanel() {
     try {
       const res = await uploadFiles(selectedFiles);
       setUploadMessage(res.message);
+      onUploaded?.();
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {

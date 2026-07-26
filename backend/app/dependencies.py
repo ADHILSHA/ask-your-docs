@@ -8,6 +8,8 @@ and swappable later (e.g. per-tenant) without touching route code.
 """
 from functools import lru_cache
 
+from app.config import get_settings
+from app.storage import DocumentStorage, LocalStorage, S3Storage
 from app.store import ChromaVectorStore, VectorStore
 
 
@@ -15,3 +17,18 @@ from app.store import ChromaVectorStore, VectorStore
 def get_vector_store() -> VectorStore:
     """Process-wide vector store, built lazily on first request."""
     return ChromaVectorStore()
+
+
+@lru_cache
+def get_document_storage() -> DocumentStorage:
+    """Raw-file storage, chosen by config: local disk (dev) or R2 (prod)."""
+    settings = get_settings()
+    if settings.storage_backend == "s3":
+        return S3Storage(
+            bucket=settings.s3_bucket,
+            endpoint_url=settings.s3_endpoint,
+            region=settings.s3_region,
+            access_key_id=settings.aws_access_key_id,
+            secret_access_key=settings.aws_secret_access_key,
+        )
+    return LocalStorage()

@@ -5,6 +5,7 @@ __pycache__/
 venv/
 .pytest_cache/
 backend/.chroma/
+backend/.storage/
 chroma_db/
 
 # ---- Node / frontend ----
@@ -37,3 +38,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+# ---- local SQLite dev DB ----
+*.db
+ask_your_docs.db

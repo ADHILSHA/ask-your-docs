@@ -3,9 +3,11 @@
 
 `VectorStore` is the contract the rest of the backend codes against; retrieval
 never imports Chroma directly. The concrete `ChromaVectorStore` persists to
-disk in-process (backend/.chroma) — a deliberate no-external-DB choice for this
-scale. Swapping to pgvector/Pinecone later means writing one more subclass, not
-touching callers.
+disk in-process (backend/.chroma).
+
+Storage is **per-user**: every chunk carries `user_id` (and `document_id`) in
+its metadata, and every query filters by `user_id`. That's how one user's
+documents stay invisible to another — a single collection, real isolation.
 
 Embeddings are passed in, not computed here: turning text into vectors is the
 embeddings module's job, which keeps this layer offline-testable and free of
@@ -30,20 +32,28 @@ _DEFAULT_PERSIST_DIR = Path(__file__).resolve().parent.parent / ".chroma"
 
 
 class VectorStore(ABC):
-    """Minimal interface: add embedded chunks, query by embedding."""
+    """Minimal, per-user interface: add embedded chunks, query, delete, reset."""
 
     @abstractmethod
     def add_chunks(
-        self, chunks: list[Chunk], embeddings: list[list[float]]
+        self,
+        user_id: str,
+        document_id: str,
+        chunks: list[Chunk],
+        embeddings: list[list[float]],
     ) -> None:
-        """Persist `chunks` alongside their parallel `embeddings`."""
+        """Persist `chunks` (+ parallel `embeddings`) owned by `user_id`."""
 
     @abstractmethod
     def query(
-        self, embedding: list[float], k: int = 5
+        self, user_id: str, embedding: list[float], k: int = 5
     ) -> list[tuple[Chunk, float]]:
-        """Return up to `k` nearest chunks as (chunk, similarity) pairs,
-        most similar first."""
+        """Return up to `k` nearest chunks *belonging to `user_id`* as
+        (chunk, similarity) pairs, most similar first."""
+
+    @abstractmethod
+    def delete_document(self, user_id: str, document_id: str) -> None:
+        """Remove all chunks of one document owned by `user_id`."""
 
     @abstractmethod
     def reset(self) -> None:
@@ -74,7 +84,11 @@ class ChromaVectorStore(VectorStore):
         )
 
     def add_chunks(
-        self, chunks: list[Chunk], embeddings: list[list[float]]
+        self,
+        user_id: str,
+        document_id: str,
+        chunks: list[Chunk],
+        embeddings: list[list[float]],
     ) -> None:
         if len(chunks) != len(embeddings):
             raise ValueError(
@@ -84,27 +98,31 @@ class ChromaVectorStore(VectorStore):
         if not chunks:
             return
 
-        # Deterministic ids so re-uploading a file replaces its chunks in place
-        # rather than duplicating them. (Two distinct files sharing a name would
-        # collide — acceptable for single-user; revisit with a content hash if
-        # that changes.)
-        ids = [f"{c.filename}::{c.chunk_index}" for c in chunks]
+        # Ids are unique per (user, document, chunk) so no cross-user or
+        # cross-document collision; re-uploading the same document replaces it.
+        ids = [f"{user_id}::{document_id}::{c.chunk_index}" for c in chunks]
         self._collection.upsert(
             ids=ids,
             documents=[c.text for c in chunks],
             embeddings=embeddings,
             metadatas=[
-                {"filename": c.filename, "chunk_index": c.chunk_index}
+                {
+                    "user_id": user_id,
+                    "document_id": document_id,
+                    "filename": c.filename,
+                    "chunk_index": c.chunk_index,
+                }
                 for c in chunks
             ],
         )
 
     def query(
-        self, embedding: list[float], k: int = 5
+        self, user_id: str, embedding: list[float], k: int = 5
     ) -> list[tuple[Chunk, float]]:
         result = self._collection.query(
             query_embeddings=[embedding],
             n_results=k,
+            where={"user_id": user_id},
             include=["documents", "metadatas", "distances"],
         )
 
@@ -122,6 +140,11 @@ class ChromaVectorStore(VectorStore):
             )
             pairs.append((chunk, 1.0 - distance))
         return pairs
+
+    def delete_document(self, user_id: str, document_id: str) -> None:
+        self._collection.delete(
+            where={"$and": [{"user_id": user_id}, {"document_id": document_id}]}
+        )
 
     def reset(self) -> None:
         # Drop the whole collection and recreate it empty — simpler and more

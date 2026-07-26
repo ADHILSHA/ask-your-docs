@@ -2,15 +2,47 @@
 """Request/response models for the API layer.
 
 Kept separate from domain logic so shapes can evolve independently as the API
-grows. Responses are currently plain dicts; add models here when they need to
-be typed/validated.
+grows.
 """
-from pydantic import BaseModel, Field
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class AskRequest(BaseModel):
-    # Non-empty and length-bounded: reject blank questions before spending an
-    # embedding call, and cap prompt size. k is bounded so a client can't ask
-    # for a runaway number of results.
-    question: str = Field(min_length=1, max_length=4000)
+class ChatRequest(BaseModel):
+    conversation_id: str
+    # The new user message. Non-empty and length-bounded; k bounds retrieval.
+    message: str = Field(min_length=1, max_length=4000)
     k: int = Field(default=5, ge=1, le=20)
+
+
+class ConversationCreate(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+
+
+class ConversationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    created_at: datetime
+
+
+class MessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    role: str
+    content: str
+    sources: list
+    created_at: datetime
+
+
+class DocumentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    filename: str
+    char_count: int
+    chunk_count: int
+    created_at: datetime

@@ -122,7 +122,7 @@ export function Workspace() {
   return (
     <div className="flex h-screen flex-col">
       <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-3 dark:border-zinc-800">
-        <h1 className="text-lg font-semibold tracking-tight">ask-your-docs</h1>
+        <h1 className="text-lg font-semibold tracking-tight">Ask Your Docs</h1>
         <button
           type="button"
           onClick={logout}

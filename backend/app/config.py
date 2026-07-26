@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-secret-change-me"
     jwt_expire_minutes: int = 60 * 24  # 1 day
 
+    # Raw-file storage. "local" writes to disk (dev); "s3" uses Cloudflare R2
+    # (S3-compatible). R2 vars are only needed when storage_backend == "s3".
+    storage_backend: str = "local"
+    s3_bucket: str = ""
+    s3_endpoint: str = ""  # R2 endpoint, e.g. https://<account>.r2.cloudflarestorage.com
+    s3_region: str = "auto"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+
     @property
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]

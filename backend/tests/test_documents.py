@@ -13,7 +13,8 @@ from sqlalchemy.orm import sessionmaker
 import app.main as main
 import app.rag.retrieval as retrieval
 from app.db import Base, get_db
-from app.dependencies import get_vector_store
+from app.dependencies import get_document_storage, get_vector_store
+from app.storage import LocalStorage
 from app.store import ChromaVectorStore
 
 
@@ -35,6 +36,7 @@ def client(tmp_path, monkeypatch):
     store = ChromaVectorStore(persist_directory=tmp_path)
     main.app.dependency_overrides[get_db] = override_db
     main.app.dependency_overrides[get_vector_store] = lambda: store
+    main.app.dependency_overrides[get_document_storage] = lambda: LocalStorage(tmp_path / "storage")
     monkeypatch.setattr(retrieval, "embed", lambda texts: [[1.0, 0.0] for _ in texts])
     yield TestClient(main.app)
     main.app.dependency_overrides.clear()
@@ -77,6 +79,25 @@ def test_cannot_delete_another_users_document(client):
     # Bob can delete his own.
     assert client.delete(f"/documents/{bob_doc_id}", headers=bob).status_code == 204
     assert client.get("/documents", headers=bob).json() == []
+
+
+def test_uploaded_file_is_downloadable(client):
+    alice = _signup(client, "alice@example.com")
+    _upload(client, alice, "cats.txt", "cats are wonderful pets")
+    doc = client.get("/documents", headers=alice).json()[0]
+
+    r = client.get(f"/documents/{doc['id']}/download", headers=alice)
+    assert r.status_code == 200
+    assert r.content == b"cats are wonderful pets"
+
+
+def test_cannot_download_another_users_file(client):
+    alice = _signup(client, "alice@example.com")
+    bob = _signup(client, "bob@example.com")
+    _upload(client, bob, "dogs.txt", "dogs are loyal")
+    bob_doc = client.get("/documents", headers=bob).json()[0]
+
+    assert client.get(f"/documents/{bob_doc['id']}/download", headers=alice).status_code == 404
 
 
 def test_documents_requires_auth(client):

@@ -5,9 +5,11 @@ import { type DocumentInfo } from "@/lib/api";
 export function DocumentsPanel({
   documents,
   onDelete,
+  onDownload,
 }: {
   documents: DocumentInfo[] | null;
   onDelete: (id: string) => void;
+  onDownload: (id: string, filename: string) => void;
 }) {
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
@@ -26,13 +28,22 @@ export function DocumentsPanel({
                 {d.filename}{" "}
                 <span className="text-zinc-400">({d.chunk_count} chunks)</span>
               </span>
-              <button
-                type="button"
-                onClick={() => onDelete(d.id)}
-                className="shrink-0 text-xs text-red-600 hover:underline dark:text-red-400"
-              >
-                Remove
-              </button>
+              <div className="flex shrink-0 gap-3">
+                <button
+                  type="button"
+                  onClick={() => onDownload(d.id, d.filename)}
+                  className="text-xs text-zinc-500 hover:underline dark:text-zinc-400"
+                >
+                  Download
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(d.id)}
+                  className="text-xs text-red-600 hover:underline dark:text-red-400"
+                >
+                  Remove
+                </button>
+              </div>
             </li>
           ))}
         </ul>

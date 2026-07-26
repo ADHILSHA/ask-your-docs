@@ -157,3 +157,23 @@ export async function deleteDocument(id: string): Promise<void> {
     throw new Error(`Delete failed (${res.status})`);
   }
 }
+
+// Download needs the Bearer header, so a plain <a href> won't work — fetch the
+// bytes and trigger a client-side download.
+export async function downloadDocument(id: string, filename: string): Promise<void> {
+  const res = await fetch(`${baseUrl()}/documents/${id}/download`, {
+    headers: { ...authHeaders() },
+  });
+  if (res.status === 401) clearToken();
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

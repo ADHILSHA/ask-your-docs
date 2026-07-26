@@ -20,8 +20,9 @@ import app.main as main
 import app.rag.retrieval as retrieval
 from app.auth.deps import get_current_user
 from app.db import Base, get_db
-from app.dependencies import get_vector_store
+from app.dependencies import get_document_storage, get_vector_store
 from app.models.user import User
+from app.storage import LocalStorage
 from app.store import ChromaVectorStore
 
 _TEST_USER = User(id="u-test", email="test@example.com", password_hash="x")
@@ -46,6 +47,7 @@ def client(tmp_path, monkeypatch):
     main.app.dependency_overrides[get_vector_store] = lambda: store
     main.app.dependency_overrides[get_current_user] = lambda: _TEST_USER
     main.app.dependency_overrides[get_db] = override_db
+    main.app.dependency_overrides[get_document_storage] = lambda: LocalStorage(tmp_path / "storage")
     monkeypatch.setattr(retrieval, "embed", lambda texts: [[1.0, 0.0] for _ in texts])
     yield TestClient(main.app)
     main.app.dependency_overrides.clear()

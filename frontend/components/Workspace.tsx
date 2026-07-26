@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { deleteDocument, listDocuments, type DocumentInfo } from "@/lib/api";
+import {
+  deleteDocument,
+  downloadDocument,
+  listDocuments,
+  type DocumentInfo,
+} from "@/lib/api";
 import { UploadPanel } from "@/components/UploadPanel";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
 import { ChatPanel } from "@/components/ChatPanel";
@@ -31,10 +36,20 @@ export function Workspace() {
     [reload],
   );
 
+  const handleDownload = useCallback((id: string, filename: string) => {
+    downloadDocument(id, filename).catch(() => {
+      // 401 clears the token in the api layer; ignore other transient errors.
+    });
+  }, []);
+
   return (
     <>
       <UploadPanel onUploaded={reload} />
-      <DocumentsPanel documents={documents} onDelete={handleDelete} />
+      <DocumentsPanel
+        documents={documents}
+        onDelete={handleDelete}
+        onDownload={handleDownload}
+      />
       <ChatPanel />
     </>
   );

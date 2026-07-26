@@ -3,8 +3,8 @@
 
 One SQLAlchemy setup for both SQLite (local dev) and Postgres (Render), chosen
 by DATABASE_URL. Routes get a session via the `get_db` dependency; models
-inherit from `Base`. Table creation lives in `init_db()`, called at startup once
-models are registered.
+inherit from `Base`. Schema is managed by Alembic migrations
+(`alembic upgrade head`), not create_all.
 """
 from collections.abc import Iterator
 
@@ -42,8 +42,3 @@ def get_db() -> Iterator[Session]:
         yield db
     finally:
         db.close()
-
-
-def init_db() -> None:
-    """Create tables for all registered models. Import models before calling."""
-    Base.metadata.create_all(bind=engine)

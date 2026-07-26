@@ -18,13 +18,19 @@ clear decisions and honest trade-offs over feature count or polish.
 - Deploy: frontend on Vercel, backend on Render (same repo, separate root dirs)
 
 ## Repo layout
-- `backend/app/` — FastAPI app; one module per concern (chunking, store,
-  retrieval, generation). Mirrors the build slices — see NOTES.md for order.
-- `frontend/app/` — single-page UI: upload, ask, answer + sources.
-- `docs/` — design note, AI-usage note, self-review (required deliverables).
+- `backend/app/` — FastAPI app, split by concern:
+  - `api/routes/` — HTTP routes (health, documents, conversations, qa/chat)
+  - `rag/` — the owned pipeline (extraction, chunking, retrieval, generation)
+  - `auth/` — bcrypt + JWT security, `get_current_user`, auth routes
+  - `models/` — SQLAlchemy models (user, document, conversation, message + links)
+  - `store.py` (Chroma vectors), `storage.py` (R2/local files), `config.py`,
+    `db.py`, `dependencies.py`, `schemas.py`
+  - `alembic/` — DB migrations (source of truth for schema)
+- `frontend/` — Next.js app: 3-pane UI (`components/`: conversations · chat ·
+  documents), `lib/api.ts` client. Auth-gated.
+- `docs/` — design note, AI-usage note, self-review (required deliverables),
+  plus the multi-user and chat plans.
 - `.claude/skills/grounding/` — the grounding/citation contract.
-- `NOTES.md` — running log of decisions and corrections. Check before
-  assuming a decision hasn't been made yet.
 
 ## Hard rules — do not violate
 - **Never put API keys in frontend code or in anything `NEXT_PUBLIC_*`.**
@@ -56,8 +62,8 @@ clear decisions and honest trade-offs over feature count or polish.
 - Prefer simple, explainable code over clever abstractions. This is a
   demo being reviewed by a human who will ask "why did you do this."
 - When you make a non-trivial choice (library, threshold value, chunking
-  strategy), state the reasoning in the response so it can be logged in
-  NOTES.md.
+  strategy), state the reasoning in the response and, where relevant, in the
+  design note / self-review.
 - Write tests for retrieval and grounding logic specifically — especially
   the two failure modes: unanswerable questions and ambiguous questions.
 - Keep commits atomic with clear, conventional messages
@@ -66,9 +72,12 @@ clear decisions and honest trade-offs over feature count or polish.
 ## Config / environment
 - Backend env vars: `OPENAI_API_KEY`, `EMBEDDING_MODEL`, `CHAT_MODEL`,
   `SIMILARITY_THRESHOLD`, `ALLOWED_ORIGINS`, `DATABASE_URL`, `JWT_SECRET`,
-  `JWT_EXPIRE_MINUTES`. (Cloudflare R2 vars are added with the file-storage
-  milestone.) Documented in `backend/.env.example` — keep it in sync with
-  actual usage.
+  `JWT_EXPIRE_MINUTES`, and for R2: `STORAGE_BACKEND`, `S3_BUCKET`,
+  `S3_ENDPOINT`, `S3_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
+  Documented in `backend/.env.example` — keep it in sync with actual usage.
+  `DATABASE_URL` is normalized to the psycopg dialect, so a Render `postgres://`
+  value can be used verbatim. `JWT_SECRET` must be non-default in production
+  (the app fails fast otherwise).
 - Frontend env vars: `NEXT_PUBLIC_API_URL` only — nothing else should be
   `NEXT_PUBLIC_*`.
 - CORS origins are read from env, never hardcoded, so dev and prod don't

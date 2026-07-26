@@ -6,9 +6,15 @@ clear decisions and honest trade-offs over feature count or polish.
 
 ## Stack
 - Frontend: Next.js (App Router, TypeScript) — `frontend/`
-- Backend: FastAPI (Python 3.11) — `backend/`
+- Backend: FastAPI (Python 3.12) — `backend/`
 - LLM + embeddings: OpenAI (`text-embedding-3-small`, `gpt-4o-mini`)
-- Vector store: Chroma, in-process, local persistence — no external DB
+- Vector store: Chroma, in-process, local persistence (per-user isolation via a
+  `user_id` metadata filter)
+- Database: Postgres (Render) — users, document ownership, conversations;
+  SQLite locally via the same SQLAlchemy code
+- File storage: Cloudflare R2 (S3-compatible) for raw uploaded documents
+- Auth: email/password, bcrypt-hashed, stateless JWT (Bearer) — no email
+  verification (deliberate simplification)
 - Deploy: frontend on Vercel, backend on Render (same repo, separate root dirs)
 
 ## Repo layout
@@ -32,11 +38,17 @@ clear decisions and honest trade-offs over feature count or polish.
   citations are a scored requirement, not a nice-to-have.
 - **Do not modify the system prompt in `generation.py`** without being
   asked explicitly — it's hand-written and reviewed, not a draft.
-- **Do not add a hosted/managed database** (Postgres, pgvector, Pinecone,
-  etc.) unless explicitly asked. In-process Chroma is a deliberate choice
-  for this scale — see NOTES.md for the reasoning.
-- **Do not add authentication or multi-user support** unless explicitly
-  asked. Single-user is a deliberate scope cut.
+- **Multi-user with email/password auth is the current direction** (see
+  `docs/multiuser-plan.md`). Postgres (Render) is the source of truth for
+  identity, document ownership, and conversations; Cloudflare R2 stores raw
+  uploaded files. Passwords are bcrypt-hashed; JWTs are signed with a
+  server-side secret. All secrets stay server-side.
+- **Chroma stays the vector store** — Postgres/pgvector do not replace it.
+  Per-user isolation is done by tagging chunks with `user_id` in Chroma
+  metadata and filtering every query by it, not by adding a second vector DB.
+- **Every resource is owned** — documents and conversations are scoped to a
+  `user_id`; filter every query by the authenticated user and never return
+  another user's data.
 
 ## Working style
 - Build in small, narrow slices — one concern per change. Do not generate
@@ -53,8 +65,10 @@ clear decisions and honest trade-offs over feature count or polish.
 
 ## Config / environment
 - Backend env vars: `OPENAI_API_KEY`, `EMBEDDING_MODEL`, `CHAT_MODEL`,
-  `SIMILARITY_THRESHOLD`, `ALLOWED_ORIGINS`. Documented in
-  `backend/.env.example` — keep that file in sync with actual usage.
+  `SIMILARITY_THRESHOLD`, `ALLOWED_ORIGINS`, `DATABASE_URL`, `JWT_SECRET`,
+  `JWT_EXPIRE_MINUTES`. (Cloudflare R2 vars are added with the file-storage
+  milestone.) Documented in `backend/.env.example` — keep it in sync with
+  actual usage.
 - Frontend env vars: `NEXT_PUBLIC_API_URL` only — nothing else should be
   `NEXT_PUBLIC_*`.
 - CORS origins are read from env, never hardcoded, so dev and prod don't

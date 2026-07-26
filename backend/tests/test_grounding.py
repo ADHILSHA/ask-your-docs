@@ -113,19 +113,33 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(retrieval, "embed", _fake_embed)
 
     c = TestClient(main.app)
-    resp = c.post(
-        "/upload",
-        files=[("files", (FIXTURE_NAME, FIXTURE_TEXT.encode(), "text/markdown"))],
-    )
-    assert resp.status_code == 200
     yield c
     main.app.dependency_overrides.clear()
 
 
+def _conversation_with_doc(client):
+    """A fresh conversation with the fixture doc uploaded into its context."""
+    conv_id = client.post("/conversations").json()["id"]
+    resp = client.post(
+        "/upload",
+        data={"conversation_id": conv_id},
+        files=[("files", (FIXTURE_NAME, FIXTURE_TEXT.encode(), "text/markdown"))],
+    )
+    assert resp.status_code == 200
+    return conv_id
+
+
 def _ask(client, text):
-    """Single-turn chat: a fresh conversation with one message (no history)."""
-    conv = client.post("/conversations").json()
-    return client.post("/chat", json={"conversation_id": conv["id"], "message": text})
+    """Single-turn chat: fresh conversation with the doc, one message (no history)."""
+    conv_id = _conversation_with_doc(client)
+    return client.post("/chat", json={"conversation_id": conv_id, "message": text})
+
+
+def _assert_fixture_source(source):
+    assert source["n"] == 1  # the [1] citation in the answer
+    assert source["filename"] == FIXTURE_NAME
+    assert source["chunk_index"] == 0
+    assert source["document_id"]  # a real document id, threaded through for links
 
 
 def test_answerable_question_returns_grounded_answer_with_sources(client, monkeypatch):
@@ -136,7 +150,8 @@ def test_answerable_question_returns_grounded_answer_with_sources(client, monkey
     body = resp.json()
 
     assert body["answer"] != generation.NOT_FOUND_MESSAGE
-    assert body["sources"] == [{"filename": FIXTURE_NAME, "chunk_index": 0}]
+    assert len(body["sources"]) == 1
+    _assert_fixture_source(body["sources"][0])
 
 
 def test_out_of_scope_question_returns_not_found_and_skips_llm(client, monkeypatch):
@@ -162,7 +177,7 @@ def test_ambiguous_question_returns_clarifying_response_without_sources(client, 
 
 def test_followup_is_condensed_then_answered_grounded(client, monkeypatch):
     _mock_llm(monkeypatch, "The office has staff on weekdays [1].")
-    conv = client.post("/conversations").json()["id"]
+    conv = _conversation_with_doc(client)
 
     # First turn establishes history (no condensation call with empty history).
     client.post("/chat", json={"conversation_id": conv, "message": "Tell me about the office."})
@@ -174,15 +189,15 @@ def test_followup_is_condensed_then_answered_grounded(client, monkeypatch):
     )
     resp = client.post("/chat", json={"conversation_id": conv, "message": "and the staff?"})
     assert resp.status_code == 200
-    assert resp.json()["sources"] == [{"filename": FIXTURE_NAME, "chunk_index": 0}]
+    _assert_fixture_source(resp.json()["sources"][0])
 
 
 def test_chat_persists_messages_to_the_conversation(client, monkeypatch):
     _mock_llm(monkeypatch, "The office is open on weekdays [1].")
-    conv = client.post("/conversations").json()["id"]
+    conv = _conversation_with_doc(client)
     client.post("/chat", json={"conversation_id": conv, "message": "office hours?"})
 
     msgs = client.get(f"/conversations/{conv}/messages").json()
     assert [m["role"] for m in msgs] == ["user", "assistant"]
     assert msgs[0]["content"] == "office hours?"
-    assert msgs[1]["sources"] == [{"filename": FIXTURE_NAME, "chunk_index": 0}]
+    _assert_fixture_source(msgs[1]["sources"][0])

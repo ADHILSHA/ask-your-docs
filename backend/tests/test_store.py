@@ -43,6 +43,15 @@ def test_delete_document_removes_only_that_document(tmp_path):
     assert [c.text for c, _ in store.query("u1", [1.0, 0.0], k=5)] == ["doc two"]
 
 
+def test_query_can_scope_to_document_ids(tmp_path):
+    store = ChromaVectorStore(persist_directory=tmp_path)
+    _seed(store, "u1", "doc a text", document_id="da")
+    _seed(store, "u1", "doc b text", document_id="db")
+    # Restrict to one document.
+    scoped = store.query("u1", [1.0, 0.0], k=5, document_ids=["db"])
+    assert [c.text for c, _ in scoped] == ["doc b text"]
+
+
 def test_reset_empties_the_store(tmp_path):
     store = ChromaVectorStore(persist_directory=tmp_path)
     _seed(store, "u1", "x")

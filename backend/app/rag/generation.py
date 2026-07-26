@@ -24,7 +24,7 @@ SYSTEM_PROMPT = """You are a question-answering assistant in a conversation with
 Follow these rules exactly:
 1. If the context does not contain the answer, reply with exactly this sentence and nothing else: I couldn't find this in the documents.
 2. If the question is ambiguous or could reasonably mean several different things, do not guess — ask exactly ONE short clarifying question instead.
-3. When you do answer, cite the numbered sources you used inline using their bracket numbers, for example [1] or [2][3]. Cite only the sources you actually relied on.
+3. Cite sources inline, placing each bracketed number immediately after the specific sentence or claim it supports — do NOT group the citations together at the end of the answer. Use the numbers like [1] or [2][3], and cite only the sources you actually relied on.
 4. Keep the answer concise and grounded in the cited context."""
 
 # The one grounded fallback string, used both when nothing is retrieved / the
@@ -102,7 +102,12 @@ def extract_cited_sources(answer: str, chunks: list[Chunk]) -> list[dict]:
             seen.add(n)
             chunk = chunks[idx]
             sources.append(
-                {"filename": chunk.filename, "chunk_index": chunk.chunk_index}
+                {
+                    "n": n,  # citation number as it appears in the answer text
+                    "filename": chunk.filename,
+                    "chunk_index": chunk.chunk_index,
+                    "document_id": chunk.document_id,
+                }
             )
     return sources
 

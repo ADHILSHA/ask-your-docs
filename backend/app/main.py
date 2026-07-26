@@ -4,16 +4,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from openai import OpenAIError
 
-import app.models  # noqa: F401  (register ORM models on Base before init_db)
 from app.api.routes import conversations, documents, health, qa
 from app.auth.router import router as auth_router
 from app.config import get_settings
-from app.db import init_db
 
 
 def create_app() -> FastAPI:
+    # Schema is owned by Alembic migrations (`alembic upgrade head`), not
+    # create_all — see the Dockerfile CMD and the README.
     settings = get_settings()
-    init_db()  # create tables (SQLite locally / Postgres on Render)
     app = FastAPI(title="ask-your-docs")
 
     app.add_middleware(

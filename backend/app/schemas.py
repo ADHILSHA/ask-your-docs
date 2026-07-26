@@ -42,6 +42,7 @@ class DocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    conversation_id: str | None
     filename: str
     char_count: int
     chunk_count: int

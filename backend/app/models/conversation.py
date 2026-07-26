@@ -1,11 +1,16 @@
 # app/models/conversation.py
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+from app.models.associations import conversation_documents
+
+if TYPE_CHECKING:
+    from app.models.document import Document
 
 
 def _uuid() -> str:
@@ -23,4 +28,9 @@ class Conversation(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
+    )
+
+    # Documents in this conversation's context (many-to-many).
+    documents: Mapped[list["Document"]] = relationship(
+        secondary=conversation_documents, lazy="selectin"
     )

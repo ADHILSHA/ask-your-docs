@@ -113,19 +113,26 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(retrieval, "embed", _fake_embed)
 
     c = TestClient(main.app)
-    resp = c.post(
-        "/upload",
-        files=[("files", (FIXTURE_NAME, FIXTURE_TEXT.encode(), "text/markdown"))],
-    )
-    assert resp.status_code == 200
     yield c
     main.app.dependency_overrides.clear()
 
 
+def _conversation_with_doc(client):
+    """A fresh conversation with the fixture doc uploaded into its context."""
+    conv_id = client.post("/conversations").json()["id"]
+    resp = client.post(
+        "/upload",
+        data={"conversation_id": conv_id},
+        files=[("files", (FIXTURE_NAME, FIXTURE_TEXT.encode(), "text/markdown"))],
+    )
+    assert resp.status_code == 200
+    return conv_id
+
+
 def _ask(client, text):
-    """Single-turn chat: a fresh conversation with one message (no history)."""
-    conv = client.post("/conversations").json()
-    return client.post("/chat", json={"conversation_id": conv["id"], "message": text})
+    """Single-turn chat: fresh conversation with the doc, one message (no history)."""
+    conv_id = _conversation_with_doc(client)
+    return client.post("/chat", json={"conversation_id": conv_id, "message": text})
 
 
 def _assert_fixture_source(source):
@@ -170,7 +177,7 @@ def test_ambiguous_question_returns_clarifying_response_without_sources(client, 
 
 def test_followup_is_condensed_then_answered_grounded(client, monkeypatch):
     _mock_llm(monkeypatch, "The office has staff on weekdays [1].")
-    conv = client.post("/conversations").json()["id"]
+    conv = _conversation_with_doc(client)
 
     # First turn establishes history (no condensation call with empty history).
     client.post("/chat", json={"conversation_id": conv, "message": "Tell me about the office."})
@@ -187,7 +194,7 @@ def test_followup_is_condensed_then_answered_grounded(client, monkeypatch):
 
 def test_chat_persists_messages_to_the_conversation(client, monkeypatch):
     _mock_llm(monkeypatch, "The office is open on weekdays [1].")
-    conv = client.post("/conversations").json()["id"]
+    conv = _conversation_with_doc(client)
     client.post("/chat", json={"conversation_id": conv, "message": "office hours?"})
 
     msgs = client.get(f"/conversations/{conv}/messages").json()

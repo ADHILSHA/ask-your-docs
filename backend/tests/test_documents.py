@@ -130,6 +130,48 @@ def test_upload_rejects_another_users_conversation(client):
     assert r.status_code == 404
 
 
+def test_add_and_remove_document_from_conversation_context(client):
+    alice = _signup(client, "alice@example.com")
+    # Upload into conversation A; then reuse the doc in a new conversation B.
+    conv_a = client.post("/conversations", headers=alice).json()["id"]
+    client.post(
+        "/upload",
+        headers=alice,
+        data={"conversation_id": conv_a},
+        files=[("files", ("cats.txt", b"cats are pets", "text/plain"))],
+    )
+    doc_id = client.get(f"/conversations/{conv_a}/documents", headers=alice).json()[0]["id"]
+
+    conv_b = client.post("/conversations", headers=alice).json()["id"]
+    assert client.get(f"/conversations/{conv_b}/documents", headers=alice).json() == []
+
+    # Add the existing doc to B's context.
+    assert client.post(f"/conversations/{conv_b}/documents/{doc_id}", headers=alice).status_code == 204
+    b_docs = client.get(f"/conversations/{conv_b}/documents", headers=alice).json()
+    assert [d["id"] for d in b_docs] == [doc_id]
+
+    # Remove it again.
+    assert client.delete(f"/conversations/{conv_b}/documents/{doc_id}", headers=alice).status_code == 204
+    assert client.get(f"/conversations/{conv_b}/documents", headers=alice).json() == []
+
+
+def test_cannot_add_another_users_document_to_context(client):
+    alice = _signup(client, "alice@example.com")
+    bob = _signup(client, "bob@example.com")
+    conv_a = client.post("/conversations", headers=alice).json()["id"]
+    client.post(
+        "/upload",
+        headers=alice,
+        data={"conversation_id": conv_a},
+        files=[("files", ("cats.txt", b"cats are pets", "text/plain"))],
+    )
+    alice_doc = client.get(f"/conversations/{conv_a}/documents", headers=alice).json()[0]["id"]
+
+    bob_conv = client.post("/conversations", headers=bob).json()["id"]
+    # Bob can't pull Alice's document into his conversation.
+    assert client.post(f"/conversations/{bob_conv}/documents/{alice_doc}", headers=bob).status_code == 404
+
+
 def test_documents_requires_auth(client):
     assert client.get("/documents").status_code == 401
 

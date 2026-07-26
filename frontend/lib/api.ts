@@ -156,6 +156,33 @@ export async function getMessages(conversationId: string): Promise<MessageInfo[]
   return toData<MessageInfo[]>(res);
 }
 
+// --- Conversation document context ---
+export async function getContextDocuments(conversationId: string): Promise<DocumentInfo[]> {
+  const res = await fetch(`${baseUrl()}/conversations/${conversationId}/documents`, {
+    headers: { ...authHeaders() },
+  });
+  return toData<DocumentInfo[]>(res);
+}
+
+async function contextLink(method: "POST" | "DELETE", conversationId: string, documentId: string) {
+  const res = await fetch(
+    `${baseUrl()}/conversations/${conversationId}/documents/${documentId}`,
+    { method, headers: { ...authHeaders() } },
+  );
+  if (res.status === 401) clearToken();
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+}
+
+export function addContextDocument(conversationId: string, documentId: string): Promise<void> {
+  return contextLink("POST", conversationId, documentId);
+}
+
+export function removeContextDocument(conversationId: string, documentId: string): Promise<void> {
+  return contextLink("DELETE", conversationId, documentId);
+}
+
 // --- Auth endpoints ---
 interface TokenResponse {
   access_token: string;

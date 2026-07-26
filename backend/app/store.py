@@ -46,10 +46,15 @@ class VectorStore(ABC):
 
     @abstractmethod
     def query(
-        self, user_id: str, embedding: list[float], k: int = 5
+        self,
+        user_id: str,
+        embedding: list[float],
+        k: int = 5,
+        document_ids: list[str] | None = None,
     ) -> list[tuple[Chunk, float]]:
         """Return up to `k` nearest chunks *belonging to `user_id`* as
-        (chunk, similarity) pairs, most similar first."""
+        (chunk, similarity) pairs, most similar first. If `document_ids` is
+        given, restrict the search to those documents."""
 
     @abstractmethod
     def delete_document(self, user_id: str, document_id: str) -> None:
@@ -117,12 +122,25 @@ class ChromaVectorStore(VectorStore):
         )
 
     def query(
-        self, user_id: str, embedding: list[float], k: int = 5
+        self,
+        user_id: str,
+        embedding: list[float],
+        k: int = 5,
+        document_ids: list[str] | None = None,
     ) -> list[tuple[Chunk, float]]:
+        if document_ids is None:
+            where: dict = {"user_id": user_id}
+        else:
+            where = {
+                "$and": [
+                    {"user_id": user_id},
+                    {"document_id": {"$in": document_ids}},
+                ]
+            }
         result = self._collection.query(
             query_embeddings=[embedding],
             n_results=k,
-            where={"user_id": user_id},
+            where=where,
             include=["documents", "metadatas", "distances"],
         )
 

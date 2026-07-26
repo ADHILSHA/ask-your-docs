@@ -52,9 +52,25 @@ def chat(
         Message(conversation_id=conversation.id, role="user", content=req.message, sources=[])
     )
 
+    # Answer only from the documents in this conversation's context. No context
+    # docs -> nothing to ground in.
+    context_ids = [d.id for d in conversation.documents]
+    if not context_ids:
+        answer = generation.not_found()
+        db.add(
+            Message(
+                conversation_id=conversation.id,
+                role="assistant",
+                content=answer["answer"],
+                sources=answer["sources"],
+            )
+        )
+        db.commit()
+        return answer
+
     question = generation.condense_question(history, req.message)
     embedding = retrieval.embed([question])[0]
-    results = store.query(current_user.id, embedding, k=req.k)
+    results = store.query(current_user.id, embedding, k=req.k, document_ids=context_ids)
 
     # Relevance gate: if even the best match is below the similarity threshold,
     # the documents likely don't cover this. Skip the LLM call and return the

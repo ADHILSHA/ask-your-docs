@@ -1,6 +1,7 @@
 # app/api/routes/documents.py
 import mimetypes
 
+from sqlalchemy import delete
 from fastapi import (
     APIRouter,
     Depends,
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.db import get_db
 from app.dependencies import get_document_storage, get_vector_store
+from app.models.associations import conversation_documents
 from app.models.conversation import Conversation
 from app.models.document import Document
 from app.models.user import User
@@ -57,6 +59,7 @@ async def upload(
         )
 
     # If tagging to a conversation, it must belong to the caller.
+    conversation = None
     if conversation_id is not None:
         conversation = db.get(Conversation, conversation_id)
         if conversation is None or conversation.user_id != current_user.id:
@@ -102,6 +105,10 @@ async def upload(
         )
         db.add(document)
         db.flush()  # assign document.id before storing chunks / the file
+
+        # Add the new document to the conversation's context.
+        if conversation is not None:
+            conversation.documents.append(document)
 
         document.s3_key = storage.save(
             current_user.id, document.id, document.filename, data
@@ -180,6 +187,12 @@ def delete_document(
     store.delete_document(current_user.id, document_id)
     if document.s3_key:
         storage.delete(document.s3_key)
+    # Drop context links first so the FK to documents doesn't block the delete.
+    db.execute(
+        delete(conversation_documents).where(
+            conversation_documents.c.document_id == document_id
+        )
+    )
     db.delete(document)
     db.commit()
 

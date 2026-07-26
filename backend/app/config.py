@@ -7,7 +7,7 @@ so `openai_api_key` reads `OPENAI_API_KEY`. See .env.example.
 """
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # The placeholder JWT secret shipped for local dev — must never reach production.
@@ -56,6 +56,18 @@ class Settings(BaseSettings):
     s3_region: str = "auto"
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
+
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def _normalize_database_url(cls, url: str) -> str:
+        # Render/Heroku hand out `postgres://` or `postgresql://`, but our driver
+        # is psycopg v3, whose SQLAlchemy dialect must be named explicitly. Rewrite
+        # so the value can be pasted verbatim. SQLite / already-qualified URLs pass
+        # through unchanged.
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url[len(prefix):]
+        return url
 
     @property
     def allowed_origins_list(self) -> list[str]:

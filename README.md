@@ -46,9 +46,10 @@ uvicorn app.main:app --reload # http://localhost:8000
 ```
 Key env vars (see `backend/.env.example`): `OPENAI_API_KEY`, `EMBEDDING_MODEL`,
 `CHAT_MODEL`, `SIMILARITY_THRESHOLD`, `ALLOWED_ORIGINS`, `DATABASE_URL`,
-`JWT_SECRET`, `JWT_EXPIRE_MINUTES`, and (for R2) `STORAGE_BACKEND` + `S3_*` /
-`AWS_*`. Locally, `DATABASE_URL` defaults to SQLite and `STORAGE_BACKEND=local`,
-so no Postgres/R2 is needed for dev.
+`JWT_SECRET`, `JWT_EXPIRE_MINUTES`, (for R2) `STORAGE_BACKEND` + `S3_*` /
+`AWS_*`, and (for Chroma Cloud) `CHROMA_API_KEY` / `CHROMA_TENANT` /
+`CHROMA_DATABASE`. Locally everything defaults to SQLite + local disk, so no
+Postgres/R2/Chroma Cloud is needed for dev.
 
 Run the tests: `python -m pytest` (from `backend/`).
 

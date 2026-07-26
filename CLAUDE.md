@@ -72,8 +72,10 @@ clear decisions and honest trade-offs over feature count or polish.
 ## Config / environment
 - Backend env vars: `OPENAI_API_KEY`, `EMBEDDING_MODEL`, `CHAT_MODEL`,
   `SIMILARITY_THRESHOLD`, `ALLOWED_ORIGINS`, `DATABASE_URL`, `JWT_SECRET`,
-  `JWT_EXPIRE_MINUTES`, and for R2: `STORAGE_BACKEND`, `S3_BUCKET`,
-  `S3_ENDPOINT`, `S3_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
+  `JWT_EXPIRE_MINUTES`, for R2: `STORAGE_BACKEND`, `S3_BUCKET`,
+  `S3_ENDPOINT`, `S3_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+  and for Chroma Cloud (durable vectors): `CHROMA_API_KEY`, `CHROMA_TENANT`,
+  `CHROMA_DATABASE` (empty -> in-process Chroma).
   Documented in `backend/.env.example` — keep it in sync with actual usage.
   `DATABASE_URL` is normalized to the psycopg dialect, so a Render `postgres://`
   value can be used verbatim. `JWT_SECRET` must be non-default in production

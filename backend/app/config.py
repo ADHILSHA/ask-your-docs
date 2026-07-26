@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     jwt_secret: str = DEV_JWT_SECRET
     jwt_expire_minutes: int = 60 * 24  # 1 day
 
+    # Vector store. Empty -> in-process Chroma persisting to backend/.chroma.
+    # Set all three to use Chroma Cloud (durable across deploys).
+    chroma_api_key: str = ""
+    chroma_tenant: str = ""
+    chroma_database: str = ""
+
     # Raw-file storage. "local" writes to disk (dev); "s3" uses Cloudflare R2
     # (S3-compatible). R2 vars are only needed when storage_backend == "s3".
     storage_backend: str = "local"

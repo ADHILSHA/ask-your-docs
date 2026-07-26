@@ -71,8 +71,9 @@ secrets server-side, `.env` git/docker-ignored, none in the image · delete
 cascades context links + chunks + blob · Chroma telemetry disabled.
 
 ## Known weaknesses (product-level)
-- **Ephemeral demo storage** on Render free tier (cold starts ~30–60s; disk
-  resets) — attach a Render disk / rely on Postgres+R2 for durability.
+- **Render free tier cold starts** (~30–60s on first request). Vectors are
+  durable when the `CHROMA_*` vars point at Chroma Cloud; without them the
+  in-process Chroma index resets on redeploy (Postgres/R2 persist either way).
 - **No OCR** — image-only PDFs extract no text.
 - **No reranking / hybrid search** — pure vector top-k.
 - **Citations can still cluster** on list-heavy answers — placement is a prompt

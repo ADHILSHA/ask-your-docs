@@ -70,17 +70,37 @@ class ChromaVectorStore(VectorStore):
         self,
         persist_directory: str | Path | None = None,
         collection_name: str = "documents",
+        client: chromadb.ClientAPI | None = None,
     ) -> None:
-        persist_directory = persist_directory or _DEFAULT_PERSIST_DIR
-        Path(persist_directory).mkdir(parents=True, exist_ok=True)
-        # Disable Chroma's anonymized telemetry — no background egress from a
-        # process handling user documents.
-        self._client = chromadb.PersistentClient(
-            path=str(persist_directory),
-            settings=ChromaSettings(anonymized_telemetry=False),
-        )
+        if client is None:
+            persist_directory = persist_directory or _DEFAULT_PERSIST_DIR
+            Path(persist_directory).mkdir(parents=True, exist_ok=True)
+            # Disable Chroma's anonymized telemetry — no background egress from a
+            # process handling user documents.
+            client = chromadb.PersistentClient(
+                path=str(persist_directory),
+                settings=ChromaSettings(anonymized_telemetry=False),
+            )
+        self._client = client
         self._collection_name = collection_name
         self._collection = self._open_collection()
+
+    @classmethod
+    def cloud(
+        cls,
+        api_key: str,
+        tenant: str,
+        database: str,
+        collection_name: str = "documents",
+    ) -> "ChromaVectorStore":
+        """Chroma Cloud-backed store — durable across deploys/restarts."""
+        client = chromadb.CloudClient(
+            tenant=tenant,
+            database=database,
+            api_key=api_key,
+            settings=ChromaSettings(anonymized_telemetry=False),
+        )
+        return cls(collection_name=collection_name, client=client)
 
     def _open_collection(self):
         return self._client.get_or_create_collection(

@@ -15,7 +15,18 @@ from app.store import ChromaVectorStore, VectorStore
 
 @lru_cache
 def get_vector_store() -> VectorStore:
-    """Process-wide vector store, built lazily on first request."""
+    """Process-wide vector store, built lazily on first request.
+
+    Chroma Cloud when the CHROMA_* vars are set (durable across deploys),
+    otherwise in-process Chroma persisting to backend/.chroma.
+    """
+    settings = get_settings()
+    if settings.chroma_api_key:
+        return ChromaVectorStore.cloud(
+            api_key=settings.chroma_api_key,
+            tenant=settings.chroma_tenant,
+            database=settings.chroma_database,
+        )
     return ChromaVectorStore()
 
 

@@ -1,9 +1,13 @@
 # app/api/routes/qa.py
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.config import get_settings
+from app.db import get_db
 from app.dependencies import get_vector_store
+from app.models.conversation import Conversation
+from app.models.message import Message
 from app.models.user import User
 from app.rag import generation, retrieval
 from app.schemas import ChatRequest
@@ -16,20 +20,39 @@ router = APIRouter()
 def chat(
     req: ChatRequest,
     store: VectorStore = Depends(get_vector_store),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Answer the latest user message, grounded in the uploaded documents.
+    """Answer the next message in a conversation, grounded in the user's docs.
 
-    condense (rewrite the follow-up into a standalone question using history) →
-    embed → retrieve top-k → threshold gate → grounded generation. Returns
-    {answer, sources}; history is used only to resolve the question, never as a
-    source of facts.
+    Load history from the DB → condense the message into a standalone question →
+    embed → retrieve (scoped to the user) → threshold gate → grounded generation.
+    Persists the user + assistant messages. History resolves the question only;
+    answers stay grounded in freshly retrieved context.
     """
     settings = get_settings()
-    history = [m.model_dump() for m in req.messages[:-1]]
-    latest = req.messages[-1].content
 
-    question = generation.condense_question(history, latest)
+    conversation = db.get(Conversation, req.conversation_id)
+    if conversation is None or conversation.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    prior = (
+        db.query(Message)
+        .filter(Message.conversation_id == conversation.id)
+        .order_by(Message.created_at)
+        .all()
+    )
+    history = [{"role": m.role, "content": m.content} for m in prior]
+
+    # Name a fresh conversation after its first message.
+    if not prior:
+        conversation.title = req.message[:60]
+
+    db.add(
+        Message(conversation_id=conversation.id, role="user", content=req.message, sources=[])
+    )
+
+    question = generation.condense_question(history, req.message)
     embedding = retrieval.embed([question])[0]
     results = store.query(current_user.id, embedding, k=req.k)
 
@@ -37,10 +60,21 @@ def chat(
     # the documents likely don't cover this. Skip the LLM call and return the
     # grounded fallback rather than risk an ungrounded answer from weak matches.
     if not results or results[0][1] < settings.similarity_threshold:
-        return generation.not_found()
+        answer = generation.not_found()
+    else:
+        chunks = [chunk for chunk, _score in results]
+        answer = generation.generate_answer(question, chunks)
 
-    chunks = [chunk for chunk, _score in results]
-    return generation.generate_answer(question, chunks)
+    db.add(
+        Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=answer["answer"],
+            sources=answer["sources"],
+        )
+    )
+    db.commit()
+    return answer
 
 
 @router.get("/search")

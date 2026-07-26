@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from openai import OpenAIError
 
 import app.models  # noqa: F401  (register ORM models on Base before init_db)
-from app.api.routes import documents, health, qa
+from app.api.routes import conversations, documents, health, qa
 from app.auth.router import router as auth_router
 from app.config import get_settings
 from app.db import init_db
@@ -37,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth_router)
     app.include_router(documents.router)
+    app.include_router(conversations.router)
     app.include_router(qa.router)
 
     return app

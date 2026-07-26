@@ -76,26 +76,22 @@ def test_too_many_files_rejected(client, monkeypatch):
     assert "Too many files" in resp.json()["detail"]
 
 
-def _chat(client, messages, **extra):
-    return client.post("/chat", json={"messages": messages, **extra})
+def _chat(client, body):
+    return client.post("/chat", json=body)
 
 
-def test_chat_rejects_blank_content(client):
-    assert _chat(client, [{"role": "user", "content": ""}]).status_code == 422
+def test_chat_rejects_blank_message(client):
+    assert _chat(client, {"conversation_id": "x", "message": ""}).status_code == 422
 
 
 def test_chat_rejects_out_of_range_k(client):
-    msg = [{"role": "user", "content": "hi"}]
-    assert _chat(client, msg, k=0).status_code == 422
-    assert _chat(client, msg, k=9999).status_code == 422
+    assert _chat(client, {"conversation_id": "x", "message": "hi", "k": 0}).status_code == 422
+    assert _chat(client, {"conversation_id": "x", "message": "hi", "k": 9999}).status_code == 422
 
 
-def test_chat_requires_nonempty_history_ending_in_user(client):
-    assert _chat(client, []).status_code == 422  # empty messages
-    # last message must be from the user
-    assert _chat(
-        client, [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}]
-    ).status_code == 422
+def test_chat_unknown_conversation_404(client):
+    # Valid body + auth, but the conversation doesn't exist for this user.
+    assert _chat(client, {"conversation_id": "does-not-exist", "message": "hi"}).status_code == 404
 
 
 def test_search_validates_params(client):

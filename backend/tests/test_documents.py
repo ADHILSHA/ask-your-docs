@@ -102,3 +102,18 @@ def test_cannot_download_another_users_file(client):
 
 def test_documents_requires_auth(client):
     assert client.get("/documents").status_code == 401
+
+
+def test_conversations_are_isolated_per_user(client):
+    alice = _signup(client, "alice@example.com")
+    bob = _signup(client, "bob@example.com")
+    conv = client.post("/conversations", headers=bob).json()
+
+    # Alice can neither read nor post into Bob's conversation.
+    assert client.get(f"/conversations/{conv['id']}/messages", headers=alice).status_code == 404
+    assert (
+        client.post(
+            "/chat", headers=alice, json={"conversation_id": conv["id"], "message": "hi"}
+        ).status_code
+        == 404
+    )

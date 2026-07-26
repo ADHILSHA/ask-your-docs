@@ -7,14 +7,23 @@ export interface Source {
   chunk_index: number;
 }
 
-export interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
-
 export interface ChatResponse {
   answer: string;
   sources: Source[];
+}
+
+export interface ConversationInfo {
+  id: string;
+  title: string;
+  created_at: string;
+}
+
+export interface MessageInfo {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  sources: Source[];
+  created_at: string;
 }
 
 export interface UploadedFile {
@@ -105,15 +114,37 @@ export async function uploadFiles(files: File[]): Promise<UploadResponse> {
   return toData<UploadResponse>(res);
 }
 
-// Send the full (client-held) conversation; the backend answers the last user
-// message grounded in the uploaded docs. History resolves follow-ups.
-export async function chat(messages: Message[]): Promise<ChatResponse> {
+// Answer the next message in a server-persisted conversation. History is loaded
+// backend-side from the conversation; we just send the new message.
+export async function chat(conversationId: string, message: string): Promise<ChatResponse> {
   const res = await fetch(`${baseUrl()}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ conversation_id: conversationId, message }),
   });
   return toData<ChatResponse>(res);
+}
+
+// --- Conversations ---
+export async function createConversation(): Promise<ConversationInfo> {
+  const res = await fetch(`${baseUrl()}/conversations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({}),
+  });
+  return toData<ConversationInfo>(res);
+}
+
+export async function listConversations(): Promise<ConversationInfo[]> {
+  const res = await fetch(`${baseUrl()}/conversations`, { headers: { ...authHeaders() } });
+  return toData<ConversationInfo[]>(res);
+}
+
+export async function getMessages(conversationId: string): Promise<MessageInfo[]> {
+  const res = await fetch(`${baseUrl()}/conversations/${conversationId}/messages`, {
+    headers: { ...authHeaders() },
+  });
+  return toData<MessageInfo[]>(res);
 }
 
 // --- Auth endpoints ---

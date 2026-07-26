@@ -123,8 +123,9 @@ def client(tmp_path, monkeypatch):
 
 
 def _ask(client, text):
-    """Single-turn chat: one user message (no history, so no condensation call)."""
-    return client.post("/chat", json={"messages": [{"role": "user", "content": text}]})
+    """Single-turn chat: a fresh conversation with one message (no history)."""
+    conv = client.post("/conversations").json()
+    return client.post("/chat", json={"conversation_id": conv["id"], "message": text})
 
 
 def test_answerable_question_returns_grounded_answer_with_sources(client, monkeypatch):
@@ -160,22 +161,28 @@ def test_ambiguous_question_returns_clarifying_response_without_sources(client, 
 
 
 def test_followup_is_condensed_then_answered_grounded(client, monkeypatch):
-    # A short follow-up ("and the staff?") is rewritten to a standalone question
-    # via condensation (mocked), then retrieved + answered grounded.
+    _mock_llm(monkeypatch, "The office has staff on weekdays [1].")
+    conv = client.post("/conversations").json()["id"]
+
+    # First turn establishes history (no condensation call with empty history).
+    client.post("/chat", json={"conversation_id": conv, "message": "Tell me about the office."})
+
+    # Second turn: a short follow-up is rewritten to a standalone question via
+    # condensation (mocked), then retrieved + answered grounded.
     monkeypatch.setattr(
         generation, "condense_question", lambda history, latest: "How many office staff are there?"
     )
-    _mock_llm(monkeypatch, "The office has staff on weekdays [1].")
-
-    resp = client.post(
-        "/chat",
-        json={
-            "messages": [
-                {"role": "user", "content": "Tell me about the office."},
-                {"role": "assistant", "content": "The office is open on weekdays [1]."},
-                {"role": "user", "content": "and the staff?"},
-            ]
-        },
-    )
+    resp = client.post("/chat", json={"conversation_id": conv, "message": "and the staff?"})
     assert resp.status_code == 200
     assert resp.json()["sources"] == [{"filename": FIXTURE_NAME, "chunk_index": 0}]
+
+
+def test_chat_persists_messages_to_the_conversation(client, monkeypatch):
+    _mock_llm(monkeypatch, "The office is open on weekdays [1].")
+    conv = client.post("/conversations").json()["id"]
+    client.post("/chat", json={"conversation_id": conv, "message": "office hours?"})
+
+    msgs = client.get(f"/conversations/{conv}/messages").json()
+    assert [m["role"] for m in msgs] == ["user", "assistant"]
+    assert msgs[0]["content"] == "office hours?"
+    assert msgs[1]["sources"] == [{"filename": FIXTURE_NAME, "chunk_index": 0}]

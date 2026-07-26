@@ -1,3 +1,4 @@
+import { AuthGate } from "@/components/AuthGate";
 import { UploadPanel } from "@/components/UploadPanel";
 import { ChatPanel } from "@/components/ChatPanel";
 
@@ -12,8 +13,10 @@ export default function Home() {
         </p>
       </header>
 
-      <UploadPanel />
-      <ChatPanel />
+      <AuthGate>
+        <UploadPanel />
+        <ChatPanel />
+      </AuthGate>
     </main>
   );
 }

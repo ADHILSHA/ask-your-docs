@@ -1,7 +1,9 @@
 # app/api/routes/documents.py
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
+from app.auth.deps import get_current_user
 from app.dependencies import get_vector_store
+from app.models.user import User
 from app.rag import retrieval
 from app.rag.chunking import chunk_text
 from app.rag.extraction import UnsupportedFileType, extract_text
@@ -20,6 +22,7 @@ MAX_FILES = 20  # per request
 async def upload(
     files: list[UploadFile] = File(...),
     store: VectorStore = Depends(get_vector_store),
+    current_user: User = Depends(get_current_user),
 ):
     """Ingest one or more files: extract → chunk → embed → store.
 

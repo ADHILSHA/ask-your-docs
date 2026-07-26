@@ -1,8 +1,10 @@
 # app/api/routes/qa.py
 from fastapi import APIRouter, Depends, Query
 
+from app.auth.deps import get_current_user
 from app.config import get_settings
 from app.dependencies import get_vector_store
+from app.models.user import User
 from app.rag import generation, retrieval
 from app.schemas import ChatRequest
 from app.store import VectorStore
@@ -11,7 +13,11 @@ router = APIRouter()
 
 
 @router.post("/chat")
-def chat(req: ChatRequest, store: VectorStore = Depends(get_vector_store)):
+def chat(
+    req: ChatRequest,
+    store: VectorStore = Depends(get_vector_store),
+    current_user: User = Depends(get_current_user),
+):
     """Answer the latest user message, grounded in the uploaded documents.
 
     condense (rewrite the follow-up into a standalone question using history) →
@@ -42,6 +48,7 @@ def search(
     q: str = Query(..., min_length=1, description="Question to retrieve chunks for"),
     k: int = Query(5, ge=1, le=20),
     store: VectorStore = Depends(get_vector_store),
+    current_user: User = Depends(get_current_user),
 ):
     """TEMPORARY debug endpoint: embed the question and return the top-k chunks
     with raw similarity scores and metadata. No threshold, no LLM answer."""

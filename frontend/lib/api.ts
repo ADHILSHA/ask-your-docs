@@ -37,9 +37,35 @@ function baseUrl(): string {
   return url.replace(/\/$/, "");
 }
 
+// --- Auth token (localStorage + Bearer) ---
+const TOKEN_KEY = "ayd_token";
+
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  window.localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(TOKEN_KEY);
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // Surface FastAPI's {detail: ...} error body when a request fails, so the UI
 // can show something more useful than a bare status code.
 async function toData<T>(res: Response): Promise<T> {
+  // An expired/invalid token: drop it so the app falls back to the login screen.
+  if (res.status === 401) {
+    clearToken();
+  }
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {
@@ -65,6 +91,7 @@ export async function uploadFiles(files: File[]): Promise<UploadResponse> {
   }
   const res = await fetch(`${baseUrl()}/upload`, {
     method: "POST",
+    headers: { ...authHeaders() },
     body: form,
   });
   return toData<UploadResponse>(res);
@@ -75,8 +102,32 @@ export async function uploadFiles(files: File[]): Promise<UploadResponse> {
 export async function chat(messages: Message[]): Promise<ChatResponse> {
   const res = await fetch(`${baseUrl()}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ messages }),
   });
   return toData<ChatResponse>(res);
+}
+
+// --- Auth endpoints ---
+interface TokenResponse {
+  access_token: string;
+  token_type: string;
+}
+
+async function authenticate(path: string, email: string, password: string): Promise<void> {
+  const res = await fetch(`${baseUrl()}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await toData<TokenResponse>(res);
+  setToken(data.access_token);
+}
+
+export function signup(email: string, password: string): Promise<void> {
+  return authenticate("/auth/signup", email, password);
+}
+
+export function login(email: string, password: string): Promise<void> {
+  return authenticate("/auth/login", email, password);
 }

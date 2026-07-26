@@ -20,8 +20,12 @@ from fastapi.testclient import TestClient
 import app.main as main
 import app.rag.generation as generation
 import app.rag.retrieval as retrieval
+from app.auth.deps import get_current_user
 from app.dependencies import get_vector_store
+from app.models.user import User
 from app.store import ChromaVectorStore
+
+_TEST_USER = User(id="u-test", email="test@example.com", password_hash="x")
 
 # A single fixture document with two clear topics: office and vacation.
 FIXTURE_NAME = "handbook.md"
@@ -80,6 +84,7 @@ def client(tmp_path, monkeypatch):
     # patching the module attribute the routes call (retrieval.embed).
     store = ChromaVectorStore(persist_directory=tmp_path, collection_name="documents")
     main.app.dependency_overrides[get_vector_store] = lambda: store
+    main.app.dependency_overrides[get_current_user] = lambda: _TEST_USER
     monkeypatch.setattr(retrieval, "embed", _fake_embed)
 
     c = TestClient(main.app)
